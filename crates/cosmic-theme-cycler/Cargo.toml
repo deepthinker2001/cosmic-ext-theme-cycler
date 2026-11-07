@@ -1,0 +1,57 @@
+[package]
+name = "cosmic-theme-cycler"
+description = "Standalone COSMIC panel applet that cycles through chosen COSMIC themes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+# `cargo deb -p cosmic-theme-cycler` (or `just deb`): a .deb that installs
+# beside stock COSMIC and replaces none of its files. The asset list mirrors
+# the justfile's `install` recipe; keep the two in step. Source paths are
+# relative to this crate.
+[package.metadata.deb]
+maintainer = "Mark A Danson <mark.a.danson@protonmail.com>"
+copyright = "2026 Mark A Danson"
+license-file = ["../../LICENSE", "0"]
+section = "x11"
+priority = "optional"
+extended-description = """\
+A COSMIC panel applet that cycles the desktop theme through the COSMIC themes \
+you choose: left-click for the next one, right-click to choose them and to \
+preview a theme by resting the pointer on it. It changes only the theme and \
+COSMIC's light/dark setting to match, never the wallpaper, and installs \
+beside the stock COSMIC applets, replacing none of them."""
+depends = "$auto"
+# The panel that hosts it; a suggestion, not a hard tie to COSMIC's packages.
+recommends = "cosmic-panel"
+assets = [
+    ["target/release/cosmic-theme-cycler", "usr/bin/", "755"],
+    ["data/io.github.deepthinker2001.CosmicThemeCycler.desktop", "usr/share/applications/", "644"],
+    ["data/icons/hicolor/scalable/apps/io.github.deepthinker2001.CosmicThemeCycler-symbolic.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../README.md", "usr/share/doc/cosmic-theme-cycler/", "644"],
+    ["../../docs/install.md", "usr/share/doc/cosmic-theme-cycler/", "644"],
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+cycler-core.workspace = true
+i18n-embed.workspace = true
+i18n-embed-fl.workspace = true
+# xdg-portal: the desktop's file chooser, for importing a theme file.
+libcosmic = { workspace = true, features = ["xdg-portal"] }
+# O_NONBLOCK, so reading the --restore snapshot can't hang on a named pipe.
+libc = "0.2.191"
+ron.workspace = true
+rust-embed.workspace = true
+# The --restore snapshot's format.
+serde.workspace = true
+# A thread's own runtime to catch SIGTERM when the panel stops the applet
+# (shutdown.rs), and the hover delay (`tokio::time`) on libcosmic's runtime;
+# tokio is already in the graph through libcosmic.
+tokio = { workspace = true, features = ["rt", "signal", "time"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true

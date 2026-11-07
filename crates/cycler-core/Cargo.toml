@@ -1,0 +1,28 @@
+[package]
+name = "cycler-core"
+description = "Theme discovery, built-in themes, cycle order and settings for the theme cycler; no GUI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The settings module: the derive stores one key per field, as COSMIC apps
+# do. Pinned by the root [patch] of libcosmic.
+cosmic-config = { workspace = true, features = ["macro"] }
+# The theme file format (ThemeBuilder), for the library module. Its manifest
+# always enables cosmic-config's `subscription` feature, which brings
+# iced_futures and the Wayland client crates into the core crate's graph;
+# no feature flag avoids it, and copying the format would be worse.
+cosmic-theme = { workspace = true }
+ron = { workspace = true }
+# O_NONBLOCK, so opening a theme file can't hang on a named pipe. Already in
+# Cargo.lock through the Wayland crates.
+libc = "0.2.191"
+serde = { workspace = true }
+# Logs which saved settings were unreadable or out of bounds.
+tracing = { workspace = true }

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Theme Cycler
+Comment=Cycle through chosen COSMIC themes
+Type=Application
+Exec=cosmic-theme-cycler
+Terminal=false
+Categories=COSMIC;
+Keywords=COSMIC;Applet;Theme;Appearance;Dark;Light;
+Icon=io.github.deepthinker2001.CosmicThemeCycler-symbolic
+StartupNotify=true
+NoDisplay=true
+X-CosmicApplet=true
+X-HostWaylandDisplay=true
