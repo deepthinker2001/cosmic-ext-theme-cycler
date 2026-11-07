@@ -1,0 +1,20 @@
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Sat, 07 Nov 2026 21:55:11 +0000
+Description: COSMIC Theme Cycler for Pop!_OS COSMIC
+Label: COSMIC Theme Cycler
+Origin: deepthinker2001
+Suite: stable
+MD5Sum:
+ e35f72f215a95cab000604d4dd351b06             1094 main/binary-amd64/Packages
+ 9f3a48e02d7e4b7f8480d8d691287638              680 main/binary-amd64/Packages.gz
+SHA1:
+ ee5be2cbb0a7e19ed4764fe4e2f70a4ca14040eb             1094 main/binary-amd64/Packages
+ 06281d0f69ac4b58be3f83bdeb11edd4ecd245ef              680 main/binary-amd64/Packages.gz
+SHA256:
+ dfb2aeca9e7f8aa1e13121b03025c0e720317acdfada5573ec5dd35299abb635             1094 main/binary-amd64/Packages
+ 1ad36d946217c07b127563bbf70b6e3be3ba80e525cd171aa609dea8da22944d              680 main/binary-amd64/Packages.gz
+SHA512:
+ 8b2143ba918de2ebc544b1b1b8436db7dbaf3f2314f376a02cd669ed5175e8da2b2ef57df846a7851d0478713a48fad9f1cc6e591cedbe98db337a928baab644             1094 main/binary-amd64/Packages
+ eef277fffeefd755a72777e06998dffff67c457efcbc75c2a65deb81406f89e244fdbb053d8e14ccd0cf4ffc402d7b7ee281f53cd55beedc1265dd4bb12f1c26              680 main/binary-amd64/Packages.gz
