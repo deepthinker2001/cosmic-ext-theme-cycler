@@ -68,7 +68,9 @@ audit checked:
   Every build uses the locked dependency versions and pinned COSMIC
   commits. The release `.deb` is built in a job with no write access; a
   separate job, which runs no build code, attaches it and its SHA-256
-  checksum to the release.
+  checksum to the release; a third, which also runs no build code, signs
+  the apt repository. The signing key is a repository secret that only
+  that job uses; its public half is `key.gpg` on the `gh-pages` branch.
 - **The repository.** No secrets, tokens or keys.
 
 ### Known limits
@@ -77,8 +79,10 @@ audit checked:
   radii or spacing, which COSMIC may draw badly. COSMIC Settings' own import
   accepts the same values. If a theme breaks your desktop, run
   `cosmic-theme-cycler --restore`.
-- **Checksums.** The `.sha256` beside each `.deb` shows the download is
-  intact, not who built it.
+- **Release downloads.** The `.sha256` beside each `.deb` on a release page
+  shows the download is intact, not who built it. The apt repository is
+  signed (key `1B33 3041 54C2 8AB6 0EC9 F8ED BEF9 D28E 08BD A02A`), so apt
+  checks both.
 - **Dependency advisories** are not yet checked automatically in CI.
 - **Installing from source** with `sudo just install` runs this repository's
   `justfile` as root. Read it first, or install the `.deb`.

@@ -12,7 +12,8 @@ installed Pop!_OS COSMIC (epoch-1.11.0) uses, replacing no stock component.
 | `crates/cosmic-theme-cycler` | The libcosmic applet: the panel button and its live tooltip, the theme list with hover preview, applying themes (`apply`, `fastwrite`), `--restore` and the snapshot (`restore`), the settings saver, and putting the original back when removed (`shutdown`). |
 | `scripts/check.sh` | The CI checks, runnable locally. |
 | `.github/workflows/ci.yml` | CI: formatting, clippy, tests, desktop entry validation. |
-| `.github/workflows/release.yml` | Builds the `.deb` for a published release and attaches it (see [RELEASE.md](../RELEASE.md)). |
+| `.github/workflows/release.yml` | Builds the `.deb` for a published release, attaches it, and adds it to the signed apt repository (see [RELEASE.md](../RELEASE.md)). |
+| `scripts/publish-apt.sh` | Rebuilds and signs the apt repository on the `gh-pages` branch. |
 
 ## Pinned COSMIC baseline
 

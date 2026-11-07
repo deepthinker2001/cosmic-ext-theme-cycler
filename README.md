@@ -38,6 +38,23 @@ Troubleshooting).
 
 ## Install
 
+### With apt (recommended)
+
+Add the signed repository once; updates then arrive with your normal system
+updates:
+
+```sh
+curl -fsSL https://deepthinker2001.github.io/cosmic-theme-cycler/key.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/cosmic-theme-cycler.gpg
+echo "deb [signed-by=/usr/share/keyrings/cosmic-theme-cycler.gpg] https://deepthinker2001.github.io/cosmic-theme-cycler stable main" \
+  | sudo tee /etc/apt/sources.list.d/cosmic-theme-cycler.list
+sudo apt update
+sudo apt install cosmic-theme-cycler
+```
+
+The signing key's fingerprint is
+`1B33 3041 54C2 8AB6 0EC9 F8ED BEF9 D28E 08BD A02A`.
+
 ### From a release
 
 Download the `.deb` from the
