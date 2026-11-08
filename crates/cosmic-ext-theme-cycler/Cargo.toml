@@ -1,5 +1,5 @@
 [package]
-name = "cosmic-theme-cycler"
+name = "cosmic-ext-theme-cycler"
 description = "Standalone COSMIC panel applet that cycles through chosen COSMIC themes"
 version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
 
-# `cargo deb -p cosmic-theme-cycler` (or `just deb`): a .deb that installs
+# `cargo deb -p cosmic-ext-theme-cycler` (or `just deb`): a .deb that installs
 # beside stock COSMIC and replaces none of its files. The asset list mirrors
 # the justfile's `install` recipe; keep the two in step. Source paths are
 # relative to this crate.
@@ -22,16 +22,23 @@ A COSMIC panel applet that cycles the desktop theme through the COSMIC themes \
 you choose: left-click for the next one, right-click to choose them and to \
 preview a theme by resting the pointer on it. It changes only the theme and \
 COSMIC's light/dark setting to match, never the wallpaper, and installs \
-beside the stock COSMIC applets, replacing none of them."""
+beside the stock COSMIC applets, replacing none of them. An independent \
+community project, not made or endorsed by System76."""
 depends = "$auto"
+# Up to 0.1.1 the package was called cosmic-theme-cycler: installing this
+# one removes it (Breaks + Replaces, the Debian way to rename a package;
+# versioned, so a later transitional cosmic-theme-cycler could coexist).
+# The applet moves the old settings on first run (cycler-core's migrate.rs).
+breaks = "cosmic-theme-cycler (<< 0.2.0~)"
+replaces = "cosmic-theme-cycler (<< 0.2.0~)"
 # The panel that hosts it; a suggestion, not a hard tie to COSMIC's packages.
 recommends = "cosmic-panel"
 assets = [
-    ["target/release/cosmic-theme-cycler", "usr/bin/", "755"],
-    ["data/io.github.deepthinker2001.CosmicThemeCycler.desktop", "usr/share/applications/", "644"],
-    ["data/icons/hicolor/scalable/apps/io.github.deepthinker2001.CosmicThemeCycler-symbolic.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
-    ["../../README.md", "usr/share/doc/cosmic-theme-cycler/", "644"],
-    ["../../docs/install.md", "usr/share/doc/cosmic-theme-cycler/", "644"],
+    ["target/release/cosmic-ext-theme-cycler", "usr/bin/", "755"],
+    ["data/io.github.deepthinker2001.CosmicExtThemeCycler.desktop", "usr/share/applications/", "644"],
+    ["data/icons/hicolor/scalable/apps/io.github.deepthinker2001.CosmicExtThemeCycler-symbolic.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../README.md", "usr/share/doc/cosmic-ext-theme-cycler/", "644"],
+    ["../../docs/install.md", "usr/share/doc/cosmic-ext-theme-cycler/", "644"],
 ]
 
 [lints]

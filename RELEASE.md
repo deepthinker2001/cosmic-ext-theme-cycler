@@ -48,10 +48,10 @@ drops the waiting one, and it has to be rerun by hand.
 
 1. **Actions → Release:** all three jobs, `build`, `publish` and `apt`,
    should pass (about 5 minutes).
-2. **The release page** should list `cosmic-theme-cycler_0.2.0-1_amd64.deb`
+2. **The release page** should list `cosmic-ext-theme-cycler_0.2.0-1_amd64.deb`
    and its `.sha256`.
 3. **apt:** on a machine with the repository added, `sudo apt update` then
-   `apt policy cosmic-theme-cycler` should show the new version as the
+   `apt policy cosmic-ext-theme-cycler` should show the new version as the
    candidate.
 
 ## If the workflow fails
@@ -70,7 +70,7 @@ drops the waiting one, and it has to be rerun by hand.
 
   ```sh
   GNUPGHOME=<keyring folder> scripts/publish-apt.sh <gh-pages checkout> \
-      1B33304154C28AB60EC9F8EDBEF9D28E08BDA02A cosmic-theme-cycler_0.2.0-1_amd64.deb
+      1B33304154C28AB60EC9F8EDBEF9D28E08BDA02A cosmic-ext-theme-cycler_0.2.0-1_amd64.deb
   ```
 
   using the `.deb` from the release page, then commit and push the

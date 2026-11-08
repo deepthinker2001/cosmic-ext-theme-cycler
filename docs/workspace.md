@@ -8,8 +8,8 @@ installed Pop!_OS COSMIC (epoch-1.11.0) uses, replacing no stock component.
 
 | Path | What it is |
 | --- | --- |
-| `crates/cycler-core` | The rules and files, with no GUI: theme discovery and import (`library`), the built-in themes (`builtin`), the cycle order (`cycle`), the applet's settings (`settings`), and whether the applet is in a panel (`panel`). |
-| `crates/cosmic-theme-cycler` | The libcosmic applet: the panel button and its live tooltip, the theme list with hover preview, applying themes (`apply`, `fastwrite`), `--restore` and the snapshot (`restore`), the settings saver, and putting the original back when removed (`shutdown`). |
+| `crates/cycler-core` | The rules and files, with no GUI: theme discovery and import (`library`), the built-in themes (`builtin`), the cycle order (`cycle`), the applet's settings (`settings`), whether the applet is in a panel (`panel`), and moving 0.1.x folders to the new name (`migrate`). |
+| `crates/cosmic-ext-theme-cycler` | The libcosmic applet: the panel button and its live tooltip, the theme list with hover preview, applying themes (`apply`, `fastwrite`), `--restore` and the snapshot (`restore`), the settings saver, and putting the original back when removed (`shutdown`). |
 | `scripts/check.sh` | The CI checks, runnable locally. |
 | `.github/workflows/ci.yml` | CI: formatting, clippy, tests, desktop entry validation. |
 | `.github/workflows/release.yml` | Builds the `.deb` for a published release, attaches it, and adds it to the signed apt repository (see [RELEASE.md](../RELEASE.md)). |
@@ -30,7 +30,7 @@ Rust 1.93 or later, plus `libxkbcommon-dev` and `libwayland-dev` (probed by
 the Wayland crates' build scripts):
 
 ```sh
-cargo build --locked -p cosmic-theme-cycler
+cargo build --locked -p cosmic-ext-theme-cycler
 ./scripts/check.sh
 ```
 

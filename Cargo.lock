@@ -956,6 +956,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmic-ext-theme-cycler"
+version = "0.2.0"
+dependencies = [
+ "cycler-core",
+ "i18n-embed",
+ "i18n-embed-fl",
+ "libc",
+ "libcosmic",
+ "ron 0.12.2",
+ "rust-embed",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "cosmic-freedesktop-icons"
 version = "0.4.0"
 source = "git+https://github.com/pop-os/freedesktop-icons#ab4c57b8e416c6af9297cb04d101889896fd9a92"
@@ -1061,23 +1078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cosmic-theme-cycler"
-version = "0.1.1"
-dependencies = [
- "cycler-core",
- "i18n-embed",
- "i18n-embed-fl",
- "libc",
- "libcosmic",
- "ron 0.12.2",
- "rust-embed",
- "serde",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1163,7 +1163,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "cycler-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmic-config",
  "cosmic-theme",

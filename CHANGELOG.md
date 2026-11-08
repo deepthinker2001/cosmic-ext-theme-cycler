@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0
+
+- Renamed from `cosmic-theme-cycler` to `cosmic-ext-theme-cycler`, following
+  the COSMIC community's `cosmic-ext-` naming for third-party extensions.
+  The package, binary, GitHub repository
+  (`deepthinker2001/cosmic-ext-theme-cycler`) and apt repository
+  (`https://deepthinker2001.github.io/cosmic-ext-theme-cycler`) all use the
+  new name. The App ID is now `io.github.deepthinker2001.CosmicExtThemeCycler`.
+- The new package breaks and replaces
+  `cosmic-theme-cycler`, so installing it removes the old one.
+- On first start (and on `--restore`) the applet moves 0.1.x's settings,
+  imported themes and original-theme record to the new folders. A folder is
+  moved only if the new one doesn't exist yet; nothing is overwritten.
+- After upgrading, add the applet to the panel again: COSMIC knows it by
+  its App ID, which changed.
+- The README and install guide now say that the project is independent and
+  not endorsed by System76.
+
 ## 0.1.1
 
 - Themes change colours only. COSMIC stores some of your settings beside a

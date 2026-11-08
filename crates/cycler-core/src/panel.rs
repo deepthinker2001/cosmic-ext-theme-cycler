@@ -74,7 +74,7 @@ pub fn in_any_panel(app_id: &str) -> bool {
 mod tests {
     use super::*;
 
-    const ME: &str = "io.github.deepthinker2001.CosmicThemeCycler";
+    const ME: &str = "io.github.deepthinker2001.CosmicExtThemeCycler";
 
     fn names(names: &[&str]) -> Vec<String> {
         names.iter().map(|&name| name.to_owned()).collect()
@@ -112,7 +112,7 @@ mod tests {
         let wings: Option<(Vec<String>, Vec<String>)> = ron::from_str(
             r#"Some(([
     "com.system76.CosmicPanelWorkspacesButton",
-    "io.github.deepthinker2001.CosmicThemeCycler",
+    "io.github.deepthinker2001.CosmicExtThemeCycler",
 ], [
     "com.system76.CosmicAppletPower",
 ]))"#,

@@ -3,7 +3,7 @@
 ## Reporting a problem
 
 Please report security problems privately, through GitHub's
-[private vulnerability reporting](https://github.com/deepthinker2001/cosmic-theme-cycler/security/advisories/new)
+[private vulnerability reporting](https://github.com/deepthinker2001/cosmic-ext-theme-cycler/security/advisories/new)
 for this repository, rather than in a public issue. Include the version, what
 you did, and what happened. Fixes go into a new release; see
 [CHANGELOG.md](CHANGELOG.md).
@@ -22,10 +22,16 @@ starts no other programs, and refuses to run as root. It reads:
 It writes only:
 
 - COSMIC's theme slots and its light/dark setting, in `~/.config/cosmic`;
-- its own settings, in `~/.config/cosmic/io.github.deepthinker2001.CosmicThemeCycler/`;
-- themes you import, in `~/.local/share/cosmic-theme-cycler/themes/`;
+- its own settings, in `~/.config/cosmic/io.github.deepthinker2001.CosmicExtThemeCycler/`;
+- themes you import, in `~/.local/share/cosmic-ext-theme-cycler/themes/`;
 - the record of your original theme and a lock file, in
-  `~/.local/state/cosmic-theme-cycler/`.
+  `~/.local/state/cosmic-ext-theme-cycler/`.
+
+Once, on the first start after upgrading from 0.1.x, it renames its own
+three folders from the old name (`io.github.deepthinker2001.CosmicThemeCycler`,
+`cosmic-theme-cycler`) to the new one. A folder is renamed only if it is a
+real folder, not a symbolic link, and the new one doesn't exist yet, so
+nothing is overwritten or merged.
 
 [docs/install.md](docs/install.md) lists every file.
 
@@ -82,7 +88,7 @@ audit checked:
   the theme's own (checked) values are written instead. A theme's colours
   can still be extreme (unreadable text, say), as with COSMIC Settings' own
   import. If a theme breaks your desktop, run
-  `cosmic-theme-cycler --restore`.
+  `cosmic-ext-theme-cycler --restore`.
 - **Release downloads.** The `.sha256` beside each `.deb` on a release page
   shows the download is intact, not who built it. The apt repository is
   signed (key `1B33 3041 54C2 8AB6 0EC9 F8ED BEF9 D28E 08BD A02A`), so apt

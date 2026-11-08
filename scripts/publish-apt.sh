@@ -22,7 +22,7 @@ if [ -z "$key" ]; then
     exit 2
 fi
 
-pool=pool/main/c/cosmic-theme-cycler
+pool=pool/main/c/cosmic-ext-theme-cycler
 dist=dists/stable
 mkdir -p "$site/$pool" "$site/$dist/main/binary-amd64"
 for deb in "$@"; do

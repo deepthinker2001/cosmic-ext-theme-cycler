@@ -7,7 +7,7 @@
 //! from the system defaults, so the user's own theme may live entirely in
 //! an older folder (`v1`) while `v2` is empty.
 //!
-//! `cosmic-theme-cycler --restore` ([`run`]) writes the snapshot back as
+//! `cosmic-ext-theme-cycler --restore` ([`run`]) writes the snapshot back as
 //! cosmic-config writes keys, so running apps, the settings daemon and the
 //! compositor all see it (they don't notice copied files), then removes the
 //! keys the folders didn't hold before, so COSMIC reads the older folder or the defaults again
@@ -547,12 +547,12 @@ fn config_home() -> Option<PathBuf> {
     absolute_env("XDG_CONFIG_HOME").or_else(|| Some(absolute_env("HOME")?.join(".config")))
 }
 
-/// `$XDG_STATE_HOME/cosmic-theme-cycler/original-theme.ron`, else under
+/// `$XDG_STATE_HOME/cosmic-ext-theme-cycler/original-theme.ron`, else under
 /// `~/.local/state`.
 pub(crate) fn snapshot_path() -> Option<PathBuf> {
     let state = absolute_env("XDG_STATE_HOME")
         .or_else(|| Some(absolute_env("HOME")?.join(".local").join("state")))?;
-    Some(state.join("cosmic-theme-cycler").join(SNAPSHOT_FILE))
+    Some(state.join(cycler_core::migrate::NAME).join(SNAPSHOT_FILE))
 }
 
 /// An environment variable holding an absolute path; relative ones are
@@ -562,7 +562,7 @@ fn absolute_env(name: &str) -> Option<PathBuf> {
     path.is_absolute().then_some(path)
 }
 
-/// `cosmic-theme-cycler --restore`: puts the theme back, forgets the
+/// `cosmic-ext-theme-cycler --restore`: puts the theme back, forgets the
 /// applied theme and says what it did. `main` has already refused to run
 /// as root.
 #[must_use]

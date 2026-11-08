@@ -5,6 +5,7 @@
 //! - [`cycle`]: which theme comes next.
 //! - [`settings`]: the applet's saved settings, through cosmic-config.
 //! - [`panel`]: whether the applet is still in a panel.
+//! - [`migrate`]: moving 0.1.x folders to the new name.
 //!
 //! Showing a theme on the desktop is the applet's job. When it applies a
 //! theme, the applet also sets COSMIC's light/dark setting to match the
@@ -13,6 +14,7 @@
 pub mod builtin;
 pub mod cycle;
 pub mod library;
+pub mod migrate;
 pub mod panel;
 pub mod settings;
 

@@ -1,22 +1,30 @@
 # COSMIC Theme Cycler
 
 A standalone panel applet for the Pop!_OS COSMIC desktop that cycles the
-desktop theme through the COSMIC themes you choose (`cosmic-theme-cycler`).
+desktop theme through the COSMIC themes you choose (`cosmic-ext-theme-cycler`).
 It changes only the theme's colours (and COSMIC's light/dark setting to
 match). It keeps your Interface density, roundness, window gaps, window hint
 and frosted glass as they are, never touches the wallpaper, and installs
 beside stock COSMIC without replacing any of its components.
 
+> **Not an official COSMIC project.** COSMIC Theme Cycler is an independent,
+> community-made applet. It is not made, endorsed, sponsored or supported by
+> System76. COSMIC and Pop!_OS are trademarks of System76, used here only to
+> say which desktop the applet works with. Please report problems
+> [here](https://github.com/deepthinker2001/cosmic-ext-theme-cycler/issues),
+> not to System76. The `cosmic-ext-` prefix follows the COSMIC community's
+> naming for third-party extensions.
+
 ## Status
 
-**0.1.1.** In daily use on Pop!_OS 24.04 with COSMIC
+**0.2.0.** In daily use on Pop!_OS 24.04 with COSMIC
 epoch-1.11.0, the release it is built against. The design is in
 [docs/applet.md](docs/applet.md); the changes in each release are under
 [Changelog](#changelog) below.
 
 Applying a theme replaces the theme in COSMIC's slot for its kind and
 switches COSMIC's light/dark setting to match. Your own theme and setting
-are recorded first, and `cosmic-theme-cycler --restore` puts them back (see
+are recorded first, and `cosmic-ext-theme-cycler --restore` puts them back (see
 Troubleshooting).
 
 ## What it does
@@ -35,9 +43,13 @@ Troubleshooting).
   `/usr/share/cosmic-themes`, and any you import.
 - It changes the theme and COSMIC's light/dark setting to match, nothing
   else (not the wallpaper, not COSMIC's automatic light/dark switching).
-- `cosmic-theme-cycler --restore` puts back the theme you had before.
+- `cosmic-ext-theme-cycler --restore` puts back the theme you had before.
 
 ## Install
+
+Upgrading from 0.1.x, when it was called `cosmic-theme-cycler`? See
+[Upgrading from cosmic-theme-cycler](#upgrading-from-cosmic-theme-cycler)
+first.
 
 ### With apt (recommended)
 
@@ -45,12 +57,12 @@ Add the signed repository once; updates then arrive with your normal system
 updates:
 
 ```sh
-curl -fsSL https://deepthinker2001.github.io/cosmic-theme-cycler/key.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/cosmic-theme-cycler.gpg
-echo "deb [signed-by=/usr/share/keyrings/cosmic-theme-cycler.gpg] https://deepthinker2001.github.io/cosmic-theme-cycler stable main" \
-  | sudo tee /etc/apt/sources.list.d/cosmic-theme-cycler.list
+curl -fsSL https://deepthinker2001.github.io/cosmic-ext-theme-cycler/key.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/cosmic-ext-theme-cycler.gpg
+echo "deb [signed-by=/usr/share/keyrings/cosmic-ext-theme-cycler.gpg] https://deepthinker2001.github.io/cosmic-ext-theme-cycler stable main" \
+  | sudo tee /etc/apt/sources.list.d/cosmic-ext-theme-cycler.list
 sudo apt update
-sudo apt install cosmic-theme-cycler
+sudo apt install cosmic-ext-theme-cycler
 ```
 
 The signing key's fingerprint is
@@ -59,12 +71,12 @@ The signing key's fingerprint is
 ### From a release
 
 Download the `.deb` from the
-[latest release](https://github.com/deepthinker2001/cosmic-theme-cycler/releases/latest),
+[latest release](https://github.com/deepthinker2001/cosmic-ext-theme-cycler/releases/latest),
 check it against its `.sha256`, and install it:
 
 ```sh
-sha256sum -c cosmic-theme-cycler_*.deb.sha256
-sudo apt install ./cosmic-theme-cycler_*.deb
+sha256sum -c cosmic-ext-theme-cycler_*.deb.sha256
+sudo apt install ./cosmic-ext-theme-cycler_*.deb
 ```
 
 ### From source
@@ -75,13 +87,34 @@ sudo ~/.cargo/bin/just install   # binary, desktop entry, icon
 ```
 
 Or build a .deb: `cargo install cargo-deb` once, then `just deb` and
-`sudo apt install ./target/debian/cosmic-theme-cycler_*.deb`.
+`sudo apt install ./target/debian/cosmic-ext-theme-cycler_*.deb`.
 
 Building needs Rust 1.93 or later and `libxkbcommon-dev` and
 `libwayland-dev` (see [docs/workspace.md](docs/workspace.md)).
 
 More detail, including every file it installs and writes, is in
 [docs/install.md](docs/install.md).
+
+### Upgrading from cosmic-theme-cycler
+
+0.2.0 renamed the project from `cosmic-theme-cycler` to
+`cosmic-ext-theme-cycler`, and the apt repository moved with it. Swap the
+old repository for the new one, then install the new package. It takes
+the old package's place:
+
+```sh
+sudo rm -f /etc/apt/sources.list.d/cosmic-theme-cycler.list \
+  /usr/share/keyrings/cosmic-theme-cycler.gpg
+# then add the repository as above, and:
+sudo apt install cosmic-ext-theme-cycler
+```
+
+The signing key is the same. On its first start the applet moves your
+settings, imported themes and the record of your original theme to their
+new folders. The new applet has a new ID, though, so COSMIC drops the old
+one from the panel. Log out and back in once (so the old 0.1.x applet
+isn't still running from memory), then add **Theme Cycler** to the panel
+again (below).
 
 ## Add it to the panel
 
@@ -93,7 +126,7 @@ completely and reopen it: it reads the applet list only when it starts.
 
 | Symptom | What to do |
 | --- | --- |
-| **Want your own theme back** | In a terminal: `cosmic-theme-cycler --restore`. It puts back the theme and light/dark setting you had before the cycler first changed them. |
+| **Want your own theme back** | In a terminal: `cosmic-ext-theme-cycler --restore`. It puts back the theme and light/dark setting you had before the cycler first changed them. |
 | Want COSMIC's original look | Toggle **COSMIC Dark** or **COSMIC Light** on and left-click until it shows, or rest the pointer on it in the list. |
 | Left-click opens the list instead of changing theme | No theme is toggled on: turn some on. |
 | A terminal's text area keeps its own colours | Expected: COSMIC Terminal's colour scheme (View → Color schemes) isn't part of the COSMIC theme. |
@@ -102,15 +135,27 @@ completely and reopen it: it reads the applet list only when it starts.
 
 ## Uninstall
 
-Remove it from the panel, then `sudo apt remove cosmic-theme-cycler` or
+Remove it from the panel, then `sudo apt remove cosmic-ext-theme-cycler` or
 `sudo ~/.cargo/bin/just uninstall`. Settings stay in
-`~/.config/cosmic/io.github.deepthinker2001.CosmicThemeCycler/` until you
+`~/.config/cosmic/io.github.deepthinker2001.CosmicExtThemeCycler/` until you
 delete them.
 
 ## Changelog
 
 What changed in each version. The full notes are in
 [CHANGELOG.md](CHANGELOG.md).
+
+### 0.2.0
+
+- **New name: `cosmic-ext-theme-cycler`.** The package, the command
+  (`cosmic-ext-theme-cycler --restore`), the GitHub repository and the apt
+  repository all use the new name. The `cosmic-ext-` prefix is the COSMIC
+  community's naming for third-party extensions. The project is
+  independent and not endorsed by System76.
+- Upgrading keeps your settings, imported themes and original theme: the
+  applet moves them to the new folders on first start. Add the applet to
+  the panel again after upgrading (see
+  [Upgrading](#upgrading-from-cosmic-theme-cycler)).
 
 ### 0.1.1
 

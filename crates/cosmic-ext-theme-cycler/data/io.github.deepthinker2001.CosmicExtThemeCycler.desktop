@@ -2,11 +2,11 @@
 Name=Theme Cycler
 Comment=Cycle through chosen COSMIC themes
 Type=Application
-Exec=cosmic-theme-cycler
+Exec=cosmic-ext-theme-cycler
 Terminal=false
 Categories=COSMIC;
 Keywords=COSMIC;Applet;Theme;Appearance;Dark;Light;
-Icon=io.github.deepthinker2001.CosmicThemeCycler-symbolic
+Icon=io.github.deepthinker2001.CosmicExtThemeCycler-symbolic
 StartupNotify=true
 NoDisplay=true
 X-CosmicApplet=true

@@ -44,7 +44,7 @@ Note anything that looks wrong, with the step number.
    the list keeps its size under the pointer. Set them back afterwards.
 8. **Tooltip.** Hover the panel icon: it names the theme shown. Left-click
    while it is open: the name changes with the theme.
-9. **Restore.** In a terminal: `cosmic-theme-cycler --restore`. Your
+9. **Restore.** In a terminal: `cosmic-ext-theme-cycler --restore`. Your
    original theme and Dark/Light setting come back everywhere.
 10. **Removal.** Click to some theme, then remove the applet from the panel
    (COSMIC Settings → Desktop → Panel → Configure panel applets): your
@@ -56,5 +56,5 @@ COSMIC theme).
 
 ## If something goes badly
 
-`cosmic-theme-cycler --restore` puts your theme back. To remove the applet:
+`cosmic-ext-theme-cycler --restore` puts your theme back. To remove the applet:
 take it out of the panel, then `sudo ~/.cargo/bin/just uninstall`.

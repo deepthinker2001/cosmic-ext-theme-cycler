@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 /// The applet's App ID, which names its cosmic-config namespace. It matches
 /// the applet crate's `APP_ID`; the core crate can't depend on the applet,
 /// so it is repeated here.
-pub const APP_ID: &str = "io.github.deepthinker2001.CosmicThemeCycler";
+pub const APP_ID: &str = "io.github.deepthinker2001.CosmicExtThemeCycler";
 
 /// The settings' config version, the `v1` in the path. Bump it only for a
 /// change old files can't be read as.

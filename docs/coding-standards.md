@@ -47,7 +47,7 @@ from it is posted upstream.
 ## Text
 
 - Every user-visible string is a Fluent message in
-  `crates/cosmic-theme-cycler/i18n/en/cosmic-theme-cycler.ftl`, looked up with
+  `crates/cosmic-ext-theme-cycler/i18n/en/cosmic-ext-theme-cycler.ftl`, looked up with
   `fl!` (checked at compile time). Variable parts are Fluent arguments.
 - Fluent wraps arguments in U+2068/U+2069 isolation marks; tests that compare
   text with arguments strip them. Isolation stays on, as in the stock applets.

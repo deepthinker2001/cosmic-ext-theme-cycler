@@ -28,7 +28,7 @@ use crate::Variant;
 pub const SYSTEM_THEMES_DIR: &str = "/usr/share/cosmic-themes";
 
 /// The user's library, relative to the XDG data folder.
-pub const USER_LIBRARY_SUBDIR: &str = "cosmic-theme-cycler/themes";
+pub const USER_LIBRARY_SUBDIR: &str = "cosmic-ext-theme-cycler/themes";
 
 /// The largest theme file read. Exported themes are about 6 KiB; the bound
 /// keeps a stray large file from stalling a scan or filling memory.

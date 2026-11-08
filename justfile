@@ -10,8 +10,8 @@
 # Only installing needs root, to write system folders. The applet never runs
 # as root. Nothing here installs over, edits or removes a stock COSMIC file.
 
-name := 'cosmic-theme-cycler'
-appid := 'io.github.deepthinker2001.CosmicThemeCycler'
+name := 'cosmic-ext-theme-cycler'
+appid := 'io.github.deepthinker2001.CosmicExtThemeCycler'
 crate := 'crates' / name
 
 rootdir := ''

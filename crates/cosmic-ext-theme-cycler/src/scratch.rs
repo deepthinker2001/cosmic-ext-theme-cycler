@@ -18,7 +18,7 @@ impl Scratch {
             .duration_since(UNIX_EPOCH)
             .map_or(0, |since| since.subsec_nanos());
         let path = std::env::temp_dir().join(format!(
-            "cosmic-theme-cycler-{label}-{}-{}-{nanos}",
+            "cosmic-ext-theme-cycler-{label}-{}-{}-{nanos}",
             std::process::id(),
             COUNTER.fetch_add(1, Ordering::Relaxed)
         ));

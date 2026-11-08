@@ -33,7 +33,7 @@ pub use cycler_core::settings::APP_ID;
 
 /// Panel icon: the applet's own symbolic icon, installed into the hicolor
 /// theme from `data/icons`.
-const ICON: &str = "io.github.deepthinker2001.CosmicThemeCycler-symbolic";
+const ICON: &str = "io.github.deepthinker2001.CosmicExtThemeCycler-symbolic";
 
 /// Run the applet under cosmic-panel.
 ///
@@ -41,15 +41,28 @@ const ICON: &str = "io.github.deepthinker2001.CosmicThemeCycler-symbolic";
 /// Returns libcosmic's error if the Wayland connection or panel handshake fails.
 pub fn run() -> iced::Result {
     localize::localize();
+    // Failures are already logged; the applet starts afresh.
+    let _ = cycler_core::migrate::run();
     applet::run::<app::ThemeCycler>(())
 }
 
-/// `cosmic-theme-cycler --restore`: puts back the theme the user had before
+/// `cosmic-ext-theme-cycler --restore`: puts back the theme the user had before
 /// the applet changed it, forgets the applied theme and says what it did.
 /// See `restore.rs`.
 #[must_use]
 pub fn restore_from_terminal() -> std::process::ExitCode {
     localize::localize();
+    for (one, error) in cycler_core::migrate::run() {
+        eprintln!(
+            "{}",
+            fl!(
+                "migrate-failed",
+                from = one.from.display().to_string(),
+                to = one.to.display().to_string(),
+                error = error.to_string()
+            )
+        );
+    }
     restore::run()
 }
 
@@ -98,7 +111,7 @@ mod tests {
             .expect("desktop entry named after APP_ID");
         assert!(entry.contains("X-CosmicApplet=true"));
         assert!(entry.contains("NoDisplay=true"));
-        assert!(entry.contains("Exec=cosmic-theme-cycler\n"));
+        assert!(entry.contains("Exec=cosmic-ext-theme-cycler\n"));
         assert!(entry.contains(&format!("Icon={ICON}\n")));
     }
 
@@ -114,6 +127,6 @@ mod tests {
     #[test]
     fn fallback_strings_resolve() {
         assert_eq!(fl!("applet-name"), "Theme Cycler");
-        assert!(usage().starts_with("Usage: cosmic-theme-cycler"));
+        assert!(usage().starts_with("Usage: cosmic-ext-theme-cycler"));
     }
 }

@@ -47,7 +47,7 @@ nothing-to-restore = Nothing to restore: the cycler hasn't changed your theme.
 restore-failed = Could not restore your theme: { $error }
 
 usage =
-    Usage: cosmic-theme-cycler [--restore | --help | --version]
+    Usage: cosmic-ext-theme-cycler [--restore | --help | --version]
 
     A COSMIC panel applet that cycles through the COSMIC themes you choose.
     Add it from COSMIC Settings → Desktop → Panel → Configure panel applets.
@@ -55,3 +55,4 @@ usage =
 
     --restore   Put back the theme (and light/dark setting) you had before
                 the cycler changed it.
+migrate-failed = Couldn't move { $from } to { $to } ({ $error }). Move it by hand, then run this again.

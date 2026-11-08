@@ -49,7 +49,7 @@ a theme's palette, so it still follows the theme. It lists:
   Moonfly, Catppuccin Latte and Mocha, Tokyo Night and Tokyo Night Light,
   Nord, and Kanagawa Wave;
 - the system presets, `/usr/share/cosmic-themes/*.ron`;
-- the user's library, `~/.local/share/cosmic-theme-cycler/themes/`.
+- the user's library, `~/.local/share/cosmic-ext-theme-cycler/themes/`.
 
 A theme is dark or light according to its palette. A file that doesn't
 parse, or holds a non-finite number, is listed as unreadable and never
@@ -95,7 +95,7 @@ happens then. Moving the applet from one panel to another may briefly leave
 it in neither, and then puts the original theme back too. Turning off the
 only panel the applet is in counts as removing it. Uninstalling the
 package doesn't run anything per user: remove the applet from the panel
-first, or run `cosmic-theme-cycler --restore`.
+first, or run `cosmic-ext-theme-cycler --restore`.
 
 ## Saving and applying without waiting
 
@@ -124,8 +124,8 @@ then redraw, which the applet doesn't control.
 Before its first write, the applet records both theme slots as COSMIC
 resolves them (including keys read from older `v1` folders and the system
 defaults) and COSMIC's light/dark setting, in
-`~/.local/state/cosmic-theme-cycler/original-theme.ron`.
-`cosmic-theme-cycler --restore` writes them back so the desktop updates,
+`~/.local/state/cosmic-ext-theme-cycler/original-theme.ron`.
+`cosmic-ext-theme-cycler --restore` writes them back so the desktop updates,
 removes the keys that weren't there before (so COSMIC reads its older
 settings and defaults again, exactly as before), forgets the applied theme,
 and deletes the record so the next change starts a new one. If the
