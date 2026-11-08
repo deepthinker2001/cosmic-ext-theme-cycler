@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - Themes change colours only. COSMIC stores some of your settings beside a
   theme's colours (Interface density, Style roundness, window gaps, the
