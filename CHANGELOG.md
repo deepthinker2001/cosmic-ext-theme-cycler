@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Themes change colours only. COSMIC stores some of your settings beside a
+  theme's colours (Interface density, Style roundness, window gaps, the
+  active window hint and frosted glass), and theme files carry their own.
+  The applet now keeps yours, both when showing a theme and on `--restore`.
+  Before, a theme could switch a Compact desktop to Standard spacing, and
+  while previewing, the theme list grew and shrank under the pointer, which
+  made it hard to click.
+
 ## 0.1.0
 
 First release.

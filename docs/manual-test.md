@@ -38,11 +38,15 @@ Note anything that looks wrong, with the step number.
 6. **Import.** Right-click → **Import theme…**, pick a `.ron` (e.g. a copy
    of `/usr/share/cosmic-themes/mocha-dark.ron` renamed in your Downloads);
    it appears in the list.
-7. **Tooltip.** Hover the panel icon: it names the theme shown. Left-click
+7. **Your settings stay.** In COSMIC Settings → Appearance, set Interface
+   density to Compact and change Style. Click through a few themes and rest
+   the pointer on others: density and roundness stay as you set them, and
+   the list keeps its size under the pointer. Set them back afterwards.
+8. **Tooltip.** Hover the panel icon: it names the theme shown. Left-click
    while it is open: the name changes with the theme.
-8. **Restore.** In a terminal: `cosmic-theme-cycler --restore`. Your
+9. **Restore.** In a terminal: `cosmic-theme-cycler --restore`. Your
    original theme and Dark/Light setting come back everywhere.
-9. **Removal.** Click to some theme, then remove the applet from the panel
+10. **Removal.** Click to some theme, then remove the applet from the panel
    (COSMIC Settings → Desktop → Panel → Configure panel applets): your
    original theme comes back. Add it again afterwards to keep testing.
 

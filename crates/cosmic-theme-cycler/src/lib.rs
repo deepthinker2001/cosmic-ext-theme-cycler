@@ -12,6 +12,7 @@ mod app;
 mod apply;
 mod background;
 mod fastwrite;
+mod keep;
 mod localize;
 mod restore;
 mod saver;

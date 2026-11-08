@@ -16,7 +16,10 @@
 //! new one. The applet does the same when it is taken out of the panel
 //! ([`restore_now`]).
 //!
-//! Only the two theme slots and the light/dark setting are written.
+//! Only the two theme slots and the light/dark setting are written. The
+//! user's own settings kept in them (density, roundness, gaps, the window
+//! hint, frosted glass: see `keep.rs`) are left as they are now, so one
+//! changed in COSMIC Settings since the snapshot isn't undone.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
@@ -35,7 +38,7 @@ use cycler_core::settings::{APP_ID, CONFIG_VERSION, Settings};
 use serde::{Deserialize, Serialize};
 
 use crate::fastwrite::{self, Durability};
-use crate::fl;
+use crate::{fl, keep};
 
 /// The key holding COSMIC's light/dark setting.
 const MODE_KEY: &str = "is_dark";
@@ -342,9 +345,10 @@ fn restore_locked(
     let Some(text) = read_snapshot(snapshot)? else {
         return Ok(false);
     };
-    let taken = parse_snapshot(&text)?;
-    write_slot(place, true, &taken.dark)?;
-    write_slot(place, false, &taken.light)?;
+    let mut taken = parse_snapshot(&text)?;
+    let (dark_kept, light_kept) = keep_user_settings(place, &mut taken);
+    write_slot(place, true, &taken.dark, &dark_kept)?;
+    write_slot(place, false, &taken.light, &light_kept)?;
     // After the slots, so COSMIC switches to one already put back.
     if let Some(mode) = &taken.mode {
         write_mode(place, mode)?;
@@ -352,6 +356,73 @@ fn restore_locked(
     // Only once everything is back: a failed restore can be tried again.
     fs::remove_file(snapshot).map_err(|error| error.to_string())?;
     Ok(true)
+}
+
+/// The keys of one slot that differ from the snapshot's because the
+/// user's settings were kept: the builder's, then the theme's.
+#[derive(Default)]
+struct Kept {
+    builder: Vec<&'static str>,
+    theme: Vec<&'static str>,
+}
+
+/// Gives both of the snapshot's slots the user's settings (see `keep.rs`)
+/// that the user changed since it was taken: those that differ between the
+/// slot COSMIC showed then and the one it shows now. Returns, per slot, the
+/// keys that so differ from the snapshot's. A slot gets its theme built
+/// again from the builder, as COSMIC Settings does, only when a frosted
+/// glass setting changed, since that changes its colours too; with nothing
+/// changed, both slots stay exactly as recorded.
+fn keep_user_settings(place: &Where, taken: &mut Snapshot) -> (Kept, Kept) {
+    let Some(now) = shown_builder(place).filter(keep::usable) else {
+        return (Kept::default(), Kept::default());
+    };
+    // A snapshot without the light/dark setting: COSMIC's default, dark.
+    let was_dark = taken.mode.as_ref().is_none_or(|mode| mode.is_dark);
+    let before = if was_dark {
+        &taken.dark.builder
+    } else {
+        &taken.light.builder
+    };
+    let changed = keep::changed(before, &now);
+    if changed.is_empty() {
+        return (Kept::default(), Kept::default());
+    }
+    let recolours = changed.iter().any(|key| keep::RECOLOURING.contains(key));
+    let keep_in = |slot: &mut Slot| {
+        let (old_builder, old_theme) = (slot.builder.clone(), slot.theme.clone());
+        keep::copy_some(&changed, &now, &mut slot.builder, &mut slot.theme);
+        if recolours {
+            slot.theme = slot.builder.clone().build();
+        }
+        Kept {
+            builder: changed_keys(&old_builder, &slot.builder),
+            theme: changed_keys(&old_theme, &slot.theme),
+        }
+    };
+    (keep_in(&mut taken.dark), keep_in(&mut taken.light))
+}
+
+/// The keys whose text differs between `old` and `new`.
+fn changed_keys<T: Serialize>(old: &T, new: &T) -> Vec<&'static str> {
+    match (fastwrite::keys(old), fastwrite::keys(new)) {
+        (Ok(old), Ok(new)) => fastwrite::changed(&old, &new)
+            .into_iter()
+            .map(|(name, _)| *name)
+            .collect(),
+        // Can't serialize (it couldn't be written either): keep them all.
+        (_, Ok(new)) => new.into_iter().map(|(name, _)| name).collect(),
+        (_, Err(_)) => Vec::new(),
+    }
+}
+
+/// The builder of the slot COSMIC shows now, as COSMIC reads it; `None` if
+/// its config can't be opened. Doesn't take the lock: callers hold it.
+/// Blocking.
+pub(crate) fn shown_builder(place: &Where) -> Option<ThemeBuilder> {
+    let (_, builder_id) = ids(read_mode(place).is_dark);
+    let config = place.config(builder_id, ThemeBuilder::VERSION).ok()?;
+    Some(ThemeBuilder::get_entry(&config).unwrap_or_else(|(_, builder)| builder))
 }
 
 /// The snapshot, checked as theme files are: it goes straight into
@@ -430,7 +501,10 @@ pub(crate) fn write_slot_entries(
     Ok(())
 }
 
-fn write_slot(place: &Where, dark: bool, slot: &Slot) -> Result<(), String> {
+/// Writes `slot` back; the `kept` keys differ from the snapshot's because
+/// the user's settings were kept, so their files stay even if the folder
+/// didn't hold them.
+fn write_slot(place: &Where, dark: bool, slot: &Slot, kept: &Kept) -> Result<(), String> {
     let (theme_id, builder_id) = ids(dark);
     // Synced: the snapshot is deleted once the restore is done.
     write_slot_entries(place, dark, &slot.builder, &slot.theme, Durability::Synced)?;
@@ -438,27 +512,31 @@ fn write_slot(place: &Where, dark: bool, slot: &Slot) -> Result<(), String> {
     // Removing the ones the folder didn't hold lets COSMIC read the older
     // folder or the defaults again for them; they hold the same values, so
     // nothing changes on screen.
+    // Not the user's settings changed since: removing those would fall
+    // back to the snapshot's older value.
     remove_added_keys(
         place.folder(builder_id, ThemeBuilder::VERSION),
         slot.builder_keys.as_deref(),
+        &kept.builder,
     );
     remove_added_keys(
         place.folder(theme_id, Theme::VERSION),
         slot.theme_keys.as_deref(),
+        &kept.theme,
     );
     Ok(())
 }
 
-/// Removes the keys in `folder` that aren't in `kept`; nothing when either
-/// is unknown. Only key files are touched (a symlinked key loses just its
+/// Removes the keys in `folder` that aren't in `kept` or `also_kept`;
+/// nothing when `folder` or `kept` is unknown. Only key files are touched (a symlinked key loses just its
 /// link); failures are left for the user to see in COSMIC Settings rather
 /// than stopping the restore.
-fn remove_added_keys(folder: Option<PathBuf>, kept: Option<&[String]>) {
+fn remove_added_keys(folder: Option<PathBuf>, kept: Option<&[String]>, also_kept: &[&str]) {
     let (Some(folder), Some(kept)) = (folder, kept) else {
         return;
     };
     for key in keys_in(Some(&folder)).unwrap_or_default() {
-        if !kept.contains(&key) {
+        if !kept.contains(&key) && !also_kept.contains(&key.as_str()) {
             let _ = fs::remove_file(folder.join(&key));
         }
     }
@@ -638,6 +716,82 @@ mod tests {
         assert!(!scratch.snapshot().exists(), "used up");
     }
 
+    fn dark_builder(place: &Where) -> ThemeBuilder {
+        let config = place
+            .config(DARK_THEME_BUILDER_ID, ThemeBuilder::VERSION)
+            .unwrap();
+        ThemeBuilder::get_entry(&config).unwrap_or_else(|(_, builder)| builder)
+    }
+
+    fn light_builder(place: &Where) -> ThemeBuilder {
+        let config = place
+            .config(LIGHT_THEME_BUILDER_ID, ThemeBuilder::VERSION)
+            .unwrap();
+        ThemeBuilder::get_entry(&config).unwrap_or_else(|(_, builder)| builder)
+    }
+
+    fn write_light(place: &Where, builder: &ThemeBuilder) {
+        let config = place
+            .config(LIGHT_THEME_BUILDER_ID, ThemeBuilder::VERSION)
+            .unwrap();
+        builder.write_entry(&config).unwrap();
+        let config = place.config(LIGHT_THEME_ID, Theme::VERSION).unwrap();
+        builder.clone().build().write_entry(&config).unwrap();
+    }
+
+    fn set_dark_mode(place: &Where, is_dark: bool) {
+        let config = place.config(THEME_MODE_ID, ThemeMode::VERSION).unwrap();
+        config.set(MODE_KEY, is_dark).unwrap();
+    }
+
+    #[test]
+    fn a_setting_changed_since_the_snapshot_is_kept() {
+        let scratch = Scratch::new();
+        let place = scratch.place();
+        // An empty dark slot: COSMIC shows its defaults.
+        ensure_snapshot(&place, &scratch.snapshot()).unwrap();
+        // The applet shows a theme with the user's settings kept, then the
+        // user changes the window gaps in COSMIC Settings.
+        let red = cosmic::cosmic_theme::palette::Srgb::new(1.0, 0.0, 0.0);
+        let mut shown = keep::user_settings(
+            &ThemeBuilder::light().accent(red),
+            Some(&dark_builder(&place)),
+        );
+        shown.gaps = (9, 9);
+        write_dark(&place, &shown);
+
+        assert_eq!(restore(&place, &scratch.snapshot(), || ()), Ok(true));
+        assert_eq!(dark_builder(&place).accent, None, "the theme is put back");
+        assert_eq!(dark_builder(&place).gaps, (9, 9), "the user's gaps stay");
+        assert_eq!(dark_theme(&place).gaps, (9, 9));
+        // Only the gaps' keys stay of those the applet added.
+        assert_eq!(scratch.keys(DARK_THEME_ID), ["gaps"]);
+        assert_eq!(scratch.keys(DARK_THEME_BUILDER_ID), ["gaps"]);
+    }
+
+    #[test]
+    fn slots_with_different_settings_are_put_back_as_they_were() {
+        let scratch = Scratch::new();
+        let place = scratch.place();
+        let mut compact = ThemeBuilder::dark();
+        compact.spacing = cosmic::cosmic_theme::Density::Compact.into();
+        write_dark(&place, &compact);
+        write_light(&place, &ThemeBuilder::light());
+        set_dark_mode(&place, true);
+        let before = (dark_theme(&place), light_builder(&place));
+        ensure_snapshot(&place, &scratch.snapshot()).unwrap();
+        // The applet shows a light theme with the dark slot's settings.
+        write_light(
+            &place,
+            &keep::user_settings(&ThemeBuilder::light(), Some(&compact)),
+        );
+        set_dark_mode(&place, false);
+        assert_ne!(light_builder(&place), before.1);
+
+        assert_eq!(restore(&place, &scratch.snapshot(), || ()), Ok(true));
+        assert_eq!((dark_theme(&place), light_builder(&place)), before);
+    }
+
     #[test]
     fn an_empty_slot_is_left_empty_again() {
         let scratch = Scratch::new();
@@ -713,8 +867,8 @@ mod tests {
         write_dark(&place, &ThemeBuilder::light());
         let before = scratch.keys(DARK_THEME_ID);
         let folder = place.folder(DARK_THEME_ID, Theme::VERSION);
-        remove_added_keys(None, Some(&[]));
-        remove_added_keys(folder, None);
+        remove_added_keys(None, Some(&[]), &[]);
+        remove_added_keys(folder, None, &[]);
         assert_eq!(scratch.keys(DARK_THEME_ID), before);
     }
 

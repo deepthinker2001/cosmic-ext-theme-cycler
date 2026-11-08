@@ -2,9 +2,10 @@
 
 A standalone panel applet for the Pop!_OS COSMIC desktop that cycles the
 desktop theme through the COSMIC themes you choose (`cosmic-theme-cycler`).
-It changes only the theme (and COSMIC's light/dark setting to match), never
-the wallpaper, and installs beside stock COSMIC without replacing any of its
-components.
+It changes only the theme's colours (and COSMIC's light/dark setting to
+match). It keeps your Interface density, roundness, window gaps, window hint
+and frosted glass as they are, never touches the wallpaper, and installs
+beside stock COSMIC without replacing any of its components.
 
 ## Status
 

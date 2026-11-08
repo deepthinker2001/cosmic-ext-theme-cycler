@@ -31,7 +31,15 @@ What the theme cycler does, and how.
 
 COSMIC themes are exported `ThemeBuilder` files (`.ron`), the files COSMIC
 Settings imports and exports. The applet changes **only the theme** and
-COSMIC's light/dark setting to match, never the wallpaper. It lists:
+COSMIC's light/dark setting to match, never the wallpaper. A theme
+changes colours only: the user's settings COSMIC stores beside them
+(Interface density, Style roundness, window gaps, the active window hint's
+width and colour, frosted glass) stay as the desktop has them, whatever
+the theme file holds (`keep.rs`). They come from COSMIC's config, and only
+if every number there is finite; otherwise the theme's own are written.
+`--restore` keeps any of them changed in COSMIC Settings since the first
+theme change and puts the rest back as they were. High contrast is part of
+a theme's palette, so it still follows the theme. It lists:
 
 - the themes built in (`cycler_core::builtin`): COSMIC's own default Dark
   and Light, read as COSMIC reads them (the user's data folder, then

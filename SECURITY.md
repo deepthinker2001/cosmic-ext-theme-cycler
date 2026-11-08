@@ -75,9 +75,13 @@ audit checked:
 
 ### Known limits
 
-- **Values in range but extreme.** A theme can still hold very large gaps,
-  radii or spacing, which COSMIC may draw badly. COSMIC Settings' own import
-  accepts the same values. If a theme breaks your desktop, run
+- **Values in range but extreme.** A theme's gaps, radii, spacing, window
+  hint and frosted-glass values are replaced by the desktop's own, read
+  from COSMIC's config and used only if every number in those settings is
+  finite. If that config can't be read or holds a non-finite number there,
+  the theme's own (checked) values are written instead. A theme's colours
+  can still be extreme (unreadable text, say), as with COSMIC Settings' own
+  import. If a theme breaks your desktop, run
   `cosmic-theme-cycler --restore`.
 - **Release downloads.** The `.sha256` beside each `.deb` on a release page
   shows the download is intact, not who built it. The apt repository is

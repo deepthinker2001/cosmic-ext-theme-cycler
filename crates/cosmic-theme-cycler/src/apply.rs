@@ -8,7 +8,10 @@
 //! COSMIC switches to a slot already holding the theme and apps choose text
 //! colours for the right kind. No other COSMIC setting is changed: COSMIC's
 //! automatic light/dark switching is left as it is. `--restore` puts the
-//! light/dark setting back too.
+//! light/dark setting back too. A theme is written with the user's own
+//! settings that COSMIC keeps beside its colours (density, roundness, gaps,
+//! the window hint, frosted glass) as the desktop has them now: see
+//! `keep.rs`.
 //!
 //! The theme changes only when the user asks (a click, or resting the
 //! pointer on a theme to preview it), never by itself.
@@ -20,7 +23,7 @@ use cosmic::cosmic_theme::{THEME_MODE_ID, Theme, ThemeBuilder, ThemeMode};
 use cycler_core::settings::{APP_ID, CONFIG_VERSION, Settings};
 
 use crate::fastwrite::{self, Durability};
-use crate::{fl, restore};
+use crate::{fl, keep, restore};
 
 /// What COSMIC showed before a preview, exactly: both slots' theme and
 /// builder, and the light/dark setting. A preview of the other kind writes
@@ -78,7 +81,13 @@ pub(crate) fn apply(
     {
         write_slots(original)?;
     }
-    write(builder, &snapshot)?;
+    // The user's settings as they were before any preview: the slot shown
+    // now may be the other kind's, put back above.
+    let current = match original {
+        Some(original) => Some(original.builder().clone()),
+        None => restore::shown_builder(&restore::Where::System),
+    };
+    write(builder, &snapshot, current.as_ref())?;
     record_applied(key);
     tracing::debug!(theme = key, waited_for_lock = ?locked, total = ?started.elapsed(), "theme written");
     Ok(())
@@ -97,7 +106,10 @@ pub(crate) fn preview(builder: &ThemeBuilder, continuing: bool) -> Result<bool, 
     if continuing && !snapshot.exists() {
         return Ok(false);
     }
-    write(builder, &snapshot)?;
+    // A preview's earlier step kept the user's settings, so the slot shown
+    // now has them either way.
+    let current = restore::shown_builder(&restore::Where::System);
+    write(builder, &snapshot, current.as_ref())?;
     Ok(true)
 }
 
@@ -171,12 +183,18 @@ fn lock(snapshot: &std::path::Path) -> Result<std::fs::File, String> {
     restore::lock(snapshot).map_err(|error| fl!("snapshot-failed", error = error))
 }
 
-/// Writes the theme, holding the lock.
-fn write(builder: &ThemeBuilder, snapshot: &std::path::Path) -> Result<(), String> {
+/// Writes the theme with the user's settings from `current` (see
+/// `keep.rs`), holding the lock.
+fn write(
+    builder: &ThemeBuilder,
+    snapshot: &std::path::Path,
+    current: Option<&ThemeBuilder>,
+) -> Result<(), String> {
     // The user's own theme is recorded before the applet's first write, so
     // `--restore` can put it back. Without it, nothing is written.
     restore::ensure_snapshot(&restore::Where::System, snapshot)
         .map_err(|error| fl!("snapshot-failed", error = error))?;
+    let builder = &keep::user_settings(builder, current);
     let dark = builder.palette.is_dark();
     let theme = builder.clone().build();
     // Builder first, then the theme, as COSMIC Settings applies an import:
