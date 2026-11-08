@@ -20,3 +20,25 @@ Description: Standalone COSMIC panel applet that cycles through chosen COSMIC th
  COSMIC's light/dark setting to match, never the wallpaper, and installs beside
  the stock COSMIC applets, replacing none of them.
 
+Package: cosmic-theme-cycler
+Architecture: amd64
+Version: 0.1.1-1
+Priority: optional
+Section: x11
+Maintainer: Mark A Danson <mark.a.danson@protonmail.com>
+Installed-Size: 20886
+Depends: libc6 (>= 2.39), libxkbcommon0 (>= 0.5.0)
+Recommends: cosmic-panel
+Filename: pool/main/c/cosmic-theme-cycler/cosmic-theme-cycler_0.1.1-1_amd64.deb
+Size: 5421564
+MD5sum: 1675f9e8c568c13c41ce03553fb2418b
+SHA1: 8dda6122ec53cea88ef412eb7ce7a3dd5563b257
+SHA256: d4103115d38e51fc79db7e0ca5025c4f6239becde0267abb254bddc80f764972
+SHA512: 28e7b49be10b2e8578c012e6a3b5a0f6ed026eb44bea8328ff28dfba338a9e9cab076bb96450721345d48d09f59404d8a0c37a2e644fa2814f4e3e1262fa082a
+Description: Standalone COSMIC panel applet that cycles through chosen COSMIC themes
+ A COSMIC panel applet that cycles the desktop theme through the COSMIC themes
+ you choose: left-click for the next one, right-click to choose them and to
+ preview a theme by resting the pointer on it. It changes only the theme and
+ COSMIC's light/dark setting to match, never the wallpaper, and installs beside
+ the stock COSMIC applets, replacing none of them.
+
