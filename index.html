@@ -13,12 +13,13 @@
 <body>
 <h1>COSMIC Theme Cycler apt repository</h1>
 <p>A COSMIC panel applet that cycles the desktop theme through the themes you choose, on Pop!_OS 24.04.
-Source and documentation: <a href="https://github.com/deepthinker2001/cosmic-theme-cycler">github.com/deepthinker2001/cosmic-theme-cycler</a>.</p>
+Source and documentation: <a href="https://github.com/deepthinker2001/cosmic-ext-theme-cycler">github.com/deepthinker2001/cosmic-ext-theme-cycler</a>.</p>
+<p><strong>Not an official COSMIC project.</strong> This is an independent, community-made applet. It is not made, endorsed, sponsored or supported by System76. COSMIC and Pop!_OS are trademarks of System76, used here only to say which desktop the applet works with.</p>
 <h2>Install</h2>
-<pre>curl -fsSL https://deepthinker2001.github.io/cosmic-theme-cycler/key.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/cosmic-theme-cycler.gpg
-echo "deb [signed-by=/usr/share/keyrings/cosmic-theme-cycler.gpg] https://deepthinker2001.github.io/cosmic-theme-cycler stable main" \
-  | sudo tee /etc/apt/sources.list.d/cosmic-theme-cycler.list
+<pre>curl -fsSL https://deepthinker2001.github.io/cosmic-ext-theme-cycler/key.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/cosmic-ext-theme-cycler.gpg
+echo "deb [signed-by=/usr/share/keyrings/cosmic-ext-theme-cycler.gpg] https://deepthinker2001.github.io/cosmic-ext-theme-cycler stable main" \
+  | sudo tee /etc/apt/sources.list.d/cosmic-ext-theme-cycler.list
 sudo apt update
 sudo apt install cosmic-theme-cycler</pre>
 <p>Then add <strong>Theme Cycler</strong> in COSMIC Settings → Desktop → Panel → Configure panel applets.
