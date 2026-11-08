@@ -9,6 +9,8 @@
   Before, a theme could switch a Compact desktop to Standard spacing, and
   while previewing, the theme list grew and shrank under the pointer, which
   made it hard to click.
+- Installable with apt from a signed repository, so system updates bring
+  new versions (set up just after the 0.1.0 release; see the README).
 
 ## 0.1.0
 

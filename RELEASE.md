@@ -14,7 +14,8 @@ branch. apt users get the new version with their next system update.
 2. **Lock file.** Run `cargo check --workspace` once so `Cargo.lock` records
    the new version. CI builds with `--locked` and fails if it doesn't.
 3. **Changelog.** Add a `## 0.2.0` section at the top of `CHANGELOG.md`: what
-   changed, from a user's point of view.
+   changed, from a user's point of view. Add a short `### 0.2.0` summary at
+   the top of the README's **Changelog** section too.
 4. **Check.** Run `./scripts/check.sh`. It runs what CI runs.
 5. **Try it in the panel.** Install the build (`just build-release`, then
    `sudo ~/.cargo/bin/just install`) and go through

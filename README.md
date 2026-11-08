@@ -11,8 +11,8 @@ beside stock COSMIC without replacing any of its components.
 
 **0.1.1.** In daily use on Pop!_OS 24.04 with COSMIC
 epoch-1.11.0, the release it is built against. The design is in
-[docs/applet.md](docs/applet.md); the changes in each release are in
-[CHANGELOG.md](CHANGELOG.md).
+[docs/applet.md](docs/applet.md); the changes in each release are under
+[Changelog](#changelog) below.
 
 Applying a theme replaces the theme in COSMIC's slot for its kind and
 switches COSMIC's light/dark setting to match. Your own theme and setting
@@ -106,6 +106,36 @@ Remove it from the panel, then `sudo apt remove cosmic-theme-cycler` or
 `sudo ~/.cargo/bin/just uninstall`. Settings stay in
 `~/.config/cosmic/io.github.deepthinker2001.CosmicThemeCycler/` until you
 delete them.
+
+## Changelog
+
+What changed in each version. The full notes are in
+[CHANGELOG.md](CHANGELOG.md).
+
+### 0.1.1
+
+- **Your settings stay yours.** Showing a theme now changes only its
+  colours. Your Interface density, roundness, window gaps, window hint and
+  frosted glass stay as you set them, and `--restore` keeps any you changed
+  since. Fixes the theme list growing and shrinking under the pointer on a
+  Compact desktop, which made it hard to click.
+- **Install with apt** from a signed repository, so system updates bring
+  new versions.
+
+### 0.1.0
+
+First release.
+
+- Cycles the desktop theme through the themes you toggle on: left-click the
+  panel icon for the next, right-click for the list. The tooltip names the
+  theme shown.
+- Rest the pointer on a theme to try it; move away and yours comes back.
+- COSMIC's own Dark and Light, ten built-in themes, COSMIC's presets, and
+  themes you import.
+- Sets COSMIC's light/dark setting to match; never touches the wallpaper or
+  automatic light/dark switching.
+- Your original theme stays in the list, and removing the applet or
+  `cosmic-theme-cycler --restore` puts it back.
 
 ## Development
 
