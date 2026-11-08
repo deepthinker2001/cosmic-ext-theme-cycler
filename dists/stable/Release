@@ -1,20 +1,20 @@
 Architectures: amd64
 Codename: stable
 Components: main
-Date: Sun, 08 Nov 2026 03:30:43 +0000
+Date: Sun, 08 Nov 2026 13:34:53 +0000
 Description: COSMIC Theme Cycler for Pop!_OS COSMIC
 Label: COSMIC Theme Cycler
 Origin: deepthinker2001
 Suite: stable
 MD5Sum:
- 9e24adf21aca62ff6ef9f9c6ba0e1625             2188 main/binary-amd64/Packages
- a173b74f17424c05c798f5fe2722f04b              888 main/binary-amd64/Packages.gz
+ ed7dd5e233ca986dff71de7e0fd029ee             3445 main/binary-amd64/Packages
+ 6b39a2813e3ffbd5dd0c754d1f7ec28b             1177 main/binary-amd64/Packages.gz
 SHA1:
- a0efd0cecf46cbfabc7c3bdf41a514198b207274             2188 main/binary-amd64/Packages
- f508bf943a5d034765519f07c18731ae8c0e7fe8              888 main/binary-amd64/Packages.gz
+ fe3ae56136e92de1ce1b14396c50b43690928585             3445 main/binary-amd64/Packages
+ e990ec381a53b2b9dca92d9387db6fa2fcc924e7             1177 main/binary-amd64/Packages.gz
 SHA256:
- 8dfbf2d1d8c725bd190c150e34978f41e1bd409f777247f764d7ea7b81e94452             2188 main/binary-amd64/Packages
- c58dae5cf76d153710dd630b103be250aa7991a5b2f986f0bd6e039858624af0              888 main/binary-amd64/Packages.gz
+ c3cf75c50dd55b756fec2a79a066f81b7c29e1172372f75cda5031f52273be99             3445 main/binary-amd64/Packages
+ 33211fe95cf666c970991c5ee79d00ae765b2a521a5eac38fdd314cd89aa04c8             1177 main/binary-amd64/Packages.gz
 SHA512:
- caf1fd46d817997bc5059af4cee3f296f3225378d301a5564c816fd6e0836fea32b8dcca7e967fdf86d30aa993a1b3ea33cbc76553e408897e279cb15bf0f275             2188 main/binary-amd64/Packages
- e8a5751e74299fa29f36660efbead627afa88ad88368eb684b7841289d23ee09f79bb9969c40e1c42024ea0e8fa2e04216bc6d22fd9224b565d2257a411d6be5              888 main/binary-amd64/Packages.gz
+ 1faa5b47448dcd042662aeaf9ea2c9035dd29db57f46c9fb879c413f1b48b81cff50ef98ea6c3bee19663d4546f8d5cf0bc5ac9bf604dd0ca3de9734d9067a57             3445 main/binary-amd64/Packages
+ 20f3648d0237e8eca2fab04d10f81861d0bd4170824b35712ad605339a47468a9dc7880b5f6737c1a63ece32ee0c9b664946ca4f8b5b3f9c864c15946eae2001             1177 main/binary-amd64/Packages.gz
