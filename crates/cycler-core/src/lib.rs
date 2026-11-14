@@ -5,6 +5,7 @@
 //! - [`cycle`]: which theme comes next.
 //! - [`settings`]: the applet's saved settings, through cosmic-config.
 //! - [`panel`]: whether the applet is still in a panel.
+//! - [`solar`]: sunrise/sunset and a smooth day curve.
 //! - [`migrate`]: moving 0.1.x folders to the new name.
 //!
 //! Showing a theme on the desktop is the applet's job. When it applies a
@@ -17,6 +18,7 @@ pub mod library;
 pub mod migrate;
 pub mod panel;
 pub mod settings;
+pub mod solar;
 
 use serde::{Deserialize, Serialize};
 
