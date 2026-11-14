@@ -26,6 +26,16 @@ pub enum SunTimes {
     PolarNight,
 }
 
+/// Days in `month` (1..=12) of `year`.
+fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        2 if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
 /// Days since 1970-01-01 of a proleptic Gregorian date.
 fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
     let y = i64::from(year) - i64::from(month <= 2);
@@ -40,15 +50,31 @@ fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
 /// Sunrise and sunset for `latitude`/`longitude` (degrees, north and east
 /// positive) on the civil date `year-month-day`. `None` for an invalid
 /// place or date.
-pub fn sun_times(latitude: f64, longitude: f64, year: i32, month: u32, day: u32) -> Option<SunTimes> {
+#[must_use]
+// The NOAA coefficients are written as published, not regrouped.
+#[allow(
+    clippy::many_single_char_names,
+    clippy::unreadable_literal,
+    clippy::inconsistent_digit_grouping
+)]
+pub fn sun_times(
+    latitude: f64,
+    longitude: f64,
+    year: i32,
+    month: u32,
+    day: u32,
+) -> Option<SunTimes> {
     if !(-90.0..=90.0).contains(&latitude)
         || !(-180.0..=180.0).contains(&longitude)
         || !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
+        || day < 1
+        || day > days_in_month(year, month)
     {
         return None;
     }
-    // Julian day of 12:00 UTC on the date.
+    // Julian day of 12:00 UTC on the date. Day counts are far below 2^52, so
+    // the conversion is exact.
+    #[allow(clippy::cast_precision_loss)]
     let jd = days_from_civil(year, month, day) as f64 + 2_440_587.5 + 0.5;
     let t = (jd - 2_451_545.0) / 36_525.0;
 
@@ -108,34 +134,51 @@ impl DayCurve {
     /// Build the curve for `times`. `rise_shift` and `set_shift` move the
     /// middle of each ramp, in minutes (negative is earlier). `ramp` is the
     /// length of each ramp in minutes (clamped to at least 1).
+    ///
+    /// Inputs that aren't finite are tolerated: a non-finite shift counts as
+    /// 0, shifts are limited to ±1 day and the ramp to 1 minute..1 day.
+    #[must_use]
     pub fn new(times: SunTimes, rise_shift: f64, set_shift: f64, ramp: f64) -> Self {
+        let shift = |s: f64| {
+            if s.is_finite() {
+                s.clamp(-DAY, DAY)
+            } else {
+                0.0
+            }
+        };
         match times {
             SunTimes::PolarDay => Self::Always,
             SunTimes::PolarNight => Self::Never,
             SunTimes::Normal { sunrise, sunset } => {
-                let rise = sunrise + rise_shift;
-                let mut set = sunset + set_shift;
-                // Keep the day after the rise, and less than a day long.
-                set = rise + (set - rise).rem_euclid(DAY);
-                Self::Cycle { rise, set, ramp: ramp.max(1.0) }
+                let rise = sunrise + shift(rise_shift);
+                // Keep the set after the rise, and less than a day later.
+                let set = rise + (sunset + shift(set_shift) - rise).rem_euclid(DAY);
+                let ramp = if ramp.is_finite() {
+                    ramp.clamp(1.0, DAY)
+                } else {
+                    1.0
+                };
+                Self::Cycle { rise, set, ramp }
             }
         }
     }
 
-    /// Lightness at `minute` (same axis as the sun times; any day).
+    /// Lightness, always within 0..=1, at `minute` (same axis as the sun
+    /// times; any day). A non-finite `minute` gives 0.
+    #[must_use]
     pub fn lightness(&self, minute: f64) -> f64 {
         match *self {
             Self::Always => 1.0,
             Self::Never => 0.0,
             Self::Cycle { rise, set, ramp } => {
+                if !minute.is_finite() {
+                    return 0.0;
+                }
+                // Put `minute` in the one day that starts at `rise`.
                 let t = rise + (minute - rise).rem_euclid(DAY);
-                // Evening ramp may straddle the wrap, so also look a day back.
                 let up = Self::step((t - rise) / ramp + 0.5);
                 let down = Self::step((set - t) / ramp + 0.5);
-                let down_prev = Self::step((set - (t - DAY)) / ramp + 0.5);
-                // t - DAY is before rise, where `up` of it is 0 anyway; the
-                // previous day's evening only matters when the ramps overlap.
-                (up * down).max(Self::step((t - DAY - rise) / ramp + 0.5) * down_prev)
+                up * down
             }
         }
     }
@@ -181,9 +224,18 @@ mod tests {
     #[test]
     fn polar_day_and_night() {
         assert_eq!(sun_times(78.2, 15.6, 2024, 6, 21), Some(SunTimes::PolarDay));
-        assert_eq!(sun_times(78.2, 15.6, 2024, 12, 21), Some(SunTimes::PolarNight));
-        assert_eq!(sun_times(-78.2, 15.6, 2024, 12, 21), Some(SunTimes::PolarDay));
-        assert_eq!(sun_times(-78.2, 15.6, 2024, 6, 21), Some(SunTimes::PolarNight));
+        assert_eq!(
+            sun_times(78.2, 15.6, 2024, 12, 21),
+            Some(SunTimes::PolarNight)
+        );
+        assert_eq!(
+            sun_times(-78.2, 15.6, 2024, 12, 21),
+            Some(SunTimes::PolarDay)
+        );
+        assert_eq!(
+            sun_times(-78.2, 15.6, 2024, 6, 21),
+            Some(SunTimes::PolarNight)
+        );
     }
 
     #[test]
@@ -192,11 +244,50 @@ mod tests {
         assert_eq!(sun_times(0.0, 181.0, 2024, 1, 1), None);
         assert_eq!(sun_times(0.0, 0.0, 2024, 13, 1), None);
         assert_eq!(sun_times(f64::NAN, 0.0, 2024, 1, 1), None);
+        assert_eq!(sun_times(0.0, 0.0, 2023, 2, 29), None);
+        assert!(sun_times(0.0, 0.0, 2024, 2, 29).is_some());
+        assert_eq!(sun_times(0.0, 0.0, 2024, 4, 31), None);
+        assert_eq!(sun_times(0.0, 0.0, 1900, 2, 29), None);
+        assert!(sun_times(0.0, 0.0, 2000, 2, 29).is_some());
+    }
+
+    #[test]
+    fn non_finite_inputs_still_give_values_in_range() {
+        let times = SunTimes::Normal {
+            sunrise: 360.0,
+            sunset: 1080.0,
+        };
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e300] {
+            let c = DayCurve::new(times, bad, bad, bad);
+            for m in [0.0, 360.0, 720.0, bad] {
+                let v = c.lightness(m);
+                assert!((0.0..=1.0).contains(&v), "{bad} {m} {v}");
+            }
+        }
+    }
+
+    #[test]
+    fn sunrise_equal_to_sunset_stays_in_range() {
+        let c = DayCurve::new(
+            SunTimes::Normal {
+                sunrise: 360.0,
+                sunset: 360.0,
+            },
+            0.0,
+            0.0,
+            60.0,
+        );
+        for m in 0..1440 {
+            assert!((0.0..=1.0).contains(&c.lightness(f64::from(m))));
+        }
     }
 
     #[test]
     fn curve_is_dark_at_night_light_by_day_half_at_sunrise() {
-        let times = SunTimes::Normal { sunrise: 360.0, sunset: 1080.0 };
+        let times = SunTimes::Normal {
+            sunrise: 360.0,
+            sunset: 1080.0,
+        };
         let c = DayCurve::new(times, 0.0, 0.0, 60.0);
         assert!(c.lightness(0.0) < 1e-9);
         assert!((c.lightness(720.0) - 1.0).abs() < 1e-9);
@@ -209,7 +300,15 @@ mod tests {
 
     #[test]
     fn curve_is_monotonic_through_sunrise() {
-        let c = DayCurve::new(SunTimes::Normal { sunrise: 360.0, sunset: 1080.0 }, 0.0, 0.0, 90.0);
+        let c = DayCurve::new(
+            SunTimes::Normal {
+                sunrise: 360.0,
+                sunset: 1080.0,
+            },
+            0.0,
+            0.0,
+            90.0,
+        );
         let mut last = -1.0;
         for m in (300..=420).step_by(5) {
             let v = c.lightness(f64::from(m));
@@ -220,7 +319,10 @@ mod tests {
 
     #[test]
     fn shifts_move_the_ramps() {
-        let times = SunTimes::Normal { sunrise: 360.0, sunset: 1080.0 };
+        let times = SunTimes::Normal {
+            sunrise: 360.0,
+            sunset: 1080.0,
+        };
         let c = DayCurve::new(times, -30.0, 45.0, 60.0);
         assert!((c.lightness(330.0) - 0.5).abs() < 1e-9);
         assert!((c.lightness(1125.0) - 0.5).abs() < 1e-9);
@@ -229,7 +331,15 @@ mod tests {
     #[test]
     fn sunset_wrapping_past_utc_midnight() {
         // Sunrise 22:00 UTC, sunset 08:00 UTC next day (given as 480).
-        let c = DayCurve::new(SunTimes::Normal { sunrise: 1320.0, sunset: 480.0 }, 0.0, 0.0, 60.0);
+        let c = DayCurve::new(
+            SunTimes::Normal {
+                sunrise: 1320.0,
+                sunset: 480.0,
+            },
+            0.0,
+            0.0,
+            60.0,
+        );
         assert!((c.lightness(1320.0) - 0.5).abs() < 1e-9);
         assert!((c.lightness(480.0) - 0.5).abs() < 1e-9);
         assert!((c.lightness(0.0) - 1.0).abs() < 1e-9);
