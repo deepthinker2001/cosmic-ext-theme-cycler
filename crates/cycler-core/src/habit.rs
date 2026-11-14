@@ -59,7 +59,7 @@ pub fn record_for(variant: Variant, now: i64, sunrise: i64, sunset: i64) -> Opti
 }
 
 fn in_range(offset_minutes: i32) -> bool {
-    offset_minutes.abs() <= MAX_OFFSET_MINUTES
+    (-MAX_OFFSET_MINUTES..=MAX_OFFSET_MINUTES).contains(&offset_minutes)
 }
 
 /// Append a record, dropping the oldest ones beyond [`MAX_HISTORY`]. A
@@ -211,6 +211,7 @@ mod tests {
         let _ = record_for(Variant::Dark, i64::MAX, 0, i64::MIN);
         let mut history = Vec::new();
         push(&mut history, rec(Variant::Dark, 400));
+        push(&mut history, rec(Variant::Dark, i32::MIN));
         assert_eq!(history, Vec::new());
     }
 
@@ -224,6 +225,7 @@ mod tests {
         assert_eq!(history[0].offset_minutes, 5);
         let mut long: Vec<_> = (0..200).map(|n| rec(Variant::Dark, n)).collect();
         long.push(rec(Variant::Dark, 5000));
+        assert_eq!(clamp_history(&[rec(Variant::Dark, i32::MIN)]), Vec::new());
         let clamped = clamp_history(&long);
         assert_eq!(clamped.len(), MAX_HISTORY);
         assert!(
