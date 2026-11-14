@@ -599,6 +599,11 @@ mod tests {
                 variant: cycler_core::Variant::Light,
                 offset_minutes: 15,
             }],
+            auto: true,
+            latitude_milli: Some(-33_870),
+            longitude_milli: Some(151_210),
+            light_theme: Some("system:comet-light".into()),
+            dark_theme: None,
         };
         assert_same_as_cosmic_config(&settings, "settings", 1);
     }

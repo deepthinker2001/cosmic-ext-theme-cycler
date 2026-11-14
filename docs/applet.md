@@ -23,9 +23,47 @@ What the theme cycler does, and how.
     one; leaving the list, or closing it, puts back exactly what was there
     (both of COSMIC's slots and its light/dark setting). A preview is never
     recorded as the applied theme.
-- The theme changes only when the user does one of these; nothing changes
-  it by itself.
+  - **Auto** (off by default) switches between a light and a dark theme by
+    the time of day; see [Auto](#auto).
+- Unless Auto is on, the theme changes only when the user does one of
+  these; nothing changes it by itself.
 - All spacing in the popup comes from the COSMIC theme.
+
+## Auto
+
+The **Auto** toggle at the top of the right-click list (saved as the `auto`
+setting) applies the light theme after sunup and the dark theme after sunset.
+
+- **Place.** Two boxes take a latitude and a longitude in decimal degrees
+  (a decimal comma is fine). Both must be within bounds (±90, ±180) before
+  they are kept; both empty means no place. With no place the applet
+  estimates one from the computer's time zone: the longitude where solar
+  noon matches its offset from UTC, at 40° north. That is rough (an hour or
+  so), so the list says when it is estimating. The place is saved as whole
+  thousandths of a degree (`latitude_milli`, `longitude_milli`), and a
+  half-set or out-of-range pair in the settings file is dropped on load
+  (bounds are range checks, never `i32::abs`, which overflows on
+  `i32::MIN`). **The applet never uses the network** to find the place; if
+  online lookup is ever added it must ask first.
+- **Timer.** Once a minute (and when Auto is switched on, the place
+  changes or the themes are found) the applet asks `cycler-core`'s
+  `schedule::wanted_variant` whether it is light or dark now: the day curve
+  (`solar::DayCurve`, from the sun times at the place) with its sunrise and
+  sunset moved by the user's learned typical offsets (`habit`). Only when
+  the answer differs from the last one acted on does it apply a theme, with
+  the same path a click uses (`apply_key`), so a theme you pick by hand
+  stays until the next sunrise or sunset. A failed write is retried at the
+  next tick.
+- **Which theme.** The theme last picked by hand for each kind is
+  remembered (`light_theme`, `dark_theme`) and is the one Auto applies; with
+  none, the first theme toggled on for the cycle of that kind. A hand pick
+  is a click or any theme chosen by the user; Auto's own writes aren't
+  remembered.
+- **Learning.** While Auto is on, a hand switch of kind is recorded as
+  minutes from that day's sunrise (light) or sunset (dark) in
+  `switch_history` (`habit::push`), so Auto moves toward when the user
+  actually switches. Choices more than six hours from the sun time, and
+  polar days, aren't recorded.
 
 ## Themes
 

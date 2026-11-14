@@ -4,6 +4,7 @@
 //! - [`builtin`]: the themes that come with the applet.
 //! - [`cycle`]: which theme comes next.
 //! - [`habit`]: the user's habitual light/dark switch times.
+//! - [`schedule`]: light or dark by the time of day, for Auto.
 //! - [`settings`]: the applet's saved settings, through cosmic-config.
 //! - [`panel`]: whether the applet is still in a panel.
 //! - [`solar`]: sunrise/sunset and a smooth day curve.
@@ -19,6 +20,7 @@ pub mod habit;
 pub mod library;
 pub mod migrate;
 pub mod panel;
+pub mod schedule;
 pub mod settings;
 pub mod solar;
 

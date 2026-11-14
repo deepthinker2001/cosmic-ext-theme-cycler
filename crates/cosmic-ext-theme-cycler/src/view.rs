@@ -7,7 +7,9 @@
 //! COSMIC theme, never fixed pixel values.
 
 use cosmic::iced::{Color, Length};
-use cosmic::widget::{button, column, container, mouse_area, scrollable, text, toggler};
+use cosmic::widget::{
+    button, column, container, mouse_area, row, scrollable, text, text_input, toggler,
+};
 use cosmic::{Element, applet, iced};
 use cycler_core::Variant;
 use cycler_core::library::{LibraryError, ReadError, Theme};
@@ -18,7 +20,7 @@ use crate::fl;
 impl ThemeCycler {
     pub(crate) fn popup_content(&self) -> Element<'_, Message> {
         let spacing = cosmic::theme::spacing();
-        column::with_capacity(3)
+        column::with_capacity(5)
             .padding([spacing.space_xxs, 0])
             .spacing(spacing.space_xxs)
             .width(Length::Fill)
@@ -27,12 +29,46 @@ impl ThemeCycler {
                     .on_press(Message::Import)
                     .width(Length::Fill),
             ))
+            .push(self.auto_view())
             .extend(
                 self.notice.as_ref().map(|notice| {
                     applet::padded_control(text::caption(notice_text(notice))).into()
                 }),
             )
             .push(self.themes_view())
+            .into()
+    }
+
+    /// The Auto toggle and the place it works from: latitude and longitude
+    /// boxes, with a line saying where the place comes from.
+    fn auto_view(&self) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+        let toggle = toggler(self.settings.auto)
+            .label(fl!("auto"))
+            .on_toggle(Message::SetAuto)
+            .width(Length::Fill);
+        let boxes = row::with_capacity(2)
+            .spacing(spacing.space_xxs)
+            .push(
+                text_input(fl!("latitude"), &self.latitude_text)
+                    .on_input(Message::Latitude)
+                    .width(Length::Fill),
+            )
+            .push(
+                text_input(fl!("longitude"), &self.longitude_text)
+                    .on_input(Message::Longitude)
+                    .width(Length::Fill),
+            );
+        let hint = if self.settings.place_milli().is_some() {
+            fl!("place-entered")
+        } else {
+            fl!("place-estimated")
+        };
+        column::with_capacity(3)
+            .spacing(spacing.space_xxxs)
+            .push(applet::padded_control(toggle))
+            .push(applet::padded_control(boxes))
+            .push(note(hint))
             .into()
     }
 

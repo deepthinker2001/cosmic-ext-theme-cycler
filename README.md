@@ -36,6 +36,11 @@ Troubleshooting).
   put it in the cycle, including **Your original theme** (what COSMIC showed
   before the cycler). Rest the pointer on a theme to try it on the desktop;
   move away and your theme comes back.
+- **Auto** (in the right-click list, off by default) applies your light
+  theme after sunup and your dark theme after sunset. Enter your latitude
+  and longitude, or leave them empty for a rough estimate from your time
+  zone; it never uses the network. It applies the light and dark theme you
+  last picked by hand and learns the times you usually switch.
 - Removing the applet from the panel puts your original theme back.
 - Themes: COSMIC's own default Dark and Light, ten more built in
   (Midnight, Frost, Overcast, Moonfly, Catppuccin Latte and Mocha, Tokyo

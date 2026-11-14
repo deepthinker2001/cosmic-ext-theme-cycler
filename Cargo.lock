@@ -959,6 +959,7 @@ dependencies = [
 name = "cosmic-ext-theme-cycler"
 version = "0.2.0"
 dependencies = [
+ "chrono",
  "cycler-core",
  "i18n-embed",
  "i18n-embed-fl",
