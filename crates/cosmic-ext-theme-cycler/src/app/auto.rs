@@ -3,6 +3,7 @@
 
 use cosmic::app::Task;
 use cycler_core::Variant;
+use cycler_core::habit;
 use cycler_core::schedule::{self, Place};
 
 use super::{Message, ThemeCycler};
@@ -24,6 +25,40 @@ pub(crate) struct Auto {
 }
 
 impl ThemeCycler {
+    /// Saves the settings in the background, if they can be saved.
+    fn save_settings(&self) {
+        if let Some(saver) = &self.saver {
+            saver.save(self.settings.clone());
+        }
+    }
+
+    /// The kind of the theme the applet applied last, if it is still listed.
+    pub(super) fn shown_variant(&self) -> Option<Variant> {
+        let key = self.settings.last_applied.as_deref()?;
+        self.theme(key).map(|theme| theme.variant)
+    }
+
+    /// The user picked `key` by hand: it is the theme Auto applies for its
+    /// kind from now on, and a switch of kind is a data point for the
+    /// learner of the user's habitual switch times.
+    pub(super) fn remember_choice(&mut self, key: &str, previous: Option<Variant>) {
+        let Some(variant) = self.theme(key).map(|theme| theme.variant) else {
+            return;
+        };
+        let slot = match variant {
+            Variant::Light => &mut self.settings.light_theme,
+            Variant::Dark => &mut self.settings.dark_theme,
+        };
+        *slot = Some(key.to_owned());
+        if self.settings.auto
+            && previous != Some(variant)
+            && let Some(record) = schedule::record_choice(self.place(), now_minutes(), variant)
+        {
+            habit::push(&mut self.settings.switch_history, record);
+        }
+        self.save_settings();
+    }
+
     /// Where the user is: the place entered, else an estimate from the time
     /// zone. Never from the network.
     pub(crate) fn place(&self) -> Place {
@@ -146,4 +181,92 @@ pub(super) fn degrees_text(milli: Option<i32>) -> String {
         let text = format!("{sign}{}.{:03}", milli / 1000, milli % 1000);
         text.trim_end_matches('0').trim_end_matches('.').to_owned()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use cosmic::Application as _;
+
+    use super::*;
+    use crate::app::tests::applet;
+
+    #[test]
+    fn typed_degrees_are_checked_and_shown_back() {
+        assert_eq!(parse_degrees(" 51.5 ", 90), Some(51_500));
+        assert_eq!(parse_degrees("-0,25", 90), Some(-250));
+        for bad in ["", "abc", "91", "-90.001", "NaN", "inf", "1e400"] {
+            assert_eq!(parse_degrees(bad, 90), None, "{bad}");
+        }
+        assert_eq!(parse_degrees("180", 180), Some(180_000));
+        assert_eq!(degrees_text(Some(51_500)), "51.5");
+        assert_eq!(degrees_text(Some(-250)), "-0.25");
+        assert_eq!(degrees_text(Some(100_000)), "100");
+        assert_eq!(degrees_text(Some(i32::MIN)), "-2147483.648");
+        assert_eq!(degrees_text(None), "");
+    }
+
+    #[test]
+    fn a_place_needs_both_boxes_and_empty_boxes_clear_it() {
+        let mut applet = applet(&[]);
+        let _ = applet.update(Message::Latitude("51.5".into()));
+        assert_eq!(applet.settings.place_milli(), None, "half typed");
+        let _ = applet.update(Message::Longitude("-0.12".into()));
+        assert_eq!(applet.settings.place_milli(), Some((51_500, -120)));
+        let _ = applet.update(Message::Longitude("200".into()));
+        assert_eq!(applet.settings.place_milli(), Some((51_500, -120)), "kept");
+        let _ = applet.update(Message::Latitude(String::new()));
+        let _ = applet.update(Message::Longitude(String::new()));
+        assert_eq!(applet.settings.place_milli(), None);
+    }
+
+    #[test]
+    fn a_manual_pick_is_remembered_for_its_kind() {
+        let mut applet = applet(&["grey-dark"]);
+        let _ = applet.next();
+        let _ = applet.applied("grey-dark", Ok(()));
+        assert_eq!(applet.settings.dark_theme.as_deref(), Some("grey-dark"));
+        assert_eq!(applet.settings.light_theme, None);
+        assert!(applet.settings.switch_history.is_empty(), "Auto is off");
+    }
+
+    #[test]
+    fn auto_applies_the_remembered_theme_for_the_period_once() {
+        let mut applet = applet(&["dim-dark"]);
+        applet.settings.light_theme = Some("pale-light".into());
+        applet.settings.dark_theme = Some("grey-dark".into());
+        let _ = applet.update(Message::SetAuto(true));
+        assert!(applet.settings.auto);
+        assert!(applet.writing, "the theme for the time of day is written");
+        let wanted = applet.auto.period.expect("a period was chosen");
+        let key = match wanted {
+            Variant::Light => "pale-light",
+            Variant::Dark => "grey-dark",
+        };
+        let _ = applet.applied(key, Ok(()));
+        assert_eq!(applet.settings.last_applied.as_deref(), Some(key));
+        // Not a manual pick: nothing remembered or learned from it.
+        assert_eq!(applet.settings.light_theme.as_deref(), Some("pale-light"));
+        let _ = applet.update(Message::AutoTick);
+        assert!(!applet.writing, "once per period");
+    }
+
+    #[test]
+    fn auto_falls_back_to_a_toggled_theme_of_the_kind_and_off_does_nothing() {
+        let mut applet = applet(&["grey-light", "grey-dark"]);
+        assert_eq!(
+            applet.auto_theme(Variant::Light).as_deref(),
+            Some("grey-light")
+        );
+        assert_eq!(
+            applet.auto_theme(Variant::Dark).as_deref(),
+            Some("grey-dark")
+        );
+        applet.settings.light_theme = Some("gone".into());
+        assert_eq!(
+            applet.auto_theme(Variant::Light).as_deref(),
+            Some("grey-light")
+        );
+        let _ = applet.update(Message::AutoTick);
+        assert!(!applet.writing, "Auto is off");
+    }
 }

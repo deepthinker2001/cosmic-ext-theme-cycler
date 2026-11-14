@@ -33,14 +33,11 @@ use cosmic::widget::mouse_area;
 use cosmic::{Element, applet, iced};
 use cycler_core::Variant;
 use cycler_core::cycle;
-use cycler_core::habit;
 use cycler_core::library::{self, LibraryError, Scan, Source, Theme};
 use cycler_core::panel::{self, PanelApplets};
-use cycler_core::schedule;
 use cycler_core::settings::{CONFIG_VERSION, Settings};
 
 mod auto;
-use auto::now_minutes;
 
 use crate::saver::Saver;
 use crate::{APP_ID, ICON, apply, background, fl, restore, shutdown, tooltip};
@@ -79,22 +76,30 @@ pub struct ThemeCycler {
     /// was set aside; it is read again once the saver is idle.
     settings_stale: bool,
     pub(crate) preview: Preview,
-    /// Each panel's config ID, to watch for the applet being removed.
-    panel_ids: Vec<String>,
-    /// Whether each panel (by config ID) holds the applet, as last read.
-    in_panels: HashMap<String, bool>,
-    /// The applet has been seen in a panel; until then (run on its own,
-    /// say) not being in one means nothing. Shared with the thread that
-    /// puts the original back when the panel stops the applet.
-    was_in_panel: Arc<AtomicBool>,
+    /// The panels and whether they hold the applet.
+    panels: Panels,
     /// The tooltip's text, shared with its popup so an open tooltip
     /// follows a click.
     tooltip_name: tooltip::Name,
+    /// Auto's state (auto.rs).
+    pub(crate) auto: auto::Auto,
+}
+
+/// Which panels hold the applet, to put the original theme back when it is
+/// taken out of them all.
+#[derive(Debug, Default)]
+struct Panels {
+    /// Each panel's config ID, to watch for the applet being removed.
+    ids: Vec<String>,
+    /// Whether each panel (by config ID) holds the applet, as last read.
+    holds: HashMap<String, bool>,
+    /// The applet has been seen in a panel; until then (run on its own,
+    /// say) not being in one means nothing. Shared with the thread that
+    /// puts the original back when the panel stops the applet.
+    was_in: Arc<AtomicBool>,
     /// The original theme is being, or has been, put back after the applet
     /// was taken out of the panel.
     reverted: bool,
-    /// Auto's state (auto.rs).
-    pub(crate) auto: auto::Auto,
 }
 
 /// Showing a theme while the pointer rests on it.
@@ -222,8 +227,8 @@ impl cosmic::Application for ThemeCycler {
             .and(restore::Where::System.folder(APP_ID, CONFIG_VERSION))
             .map(|folder| Saver::start(folder, &settings));
         let mut applet = Self::new(core, saver, settings);
-        applet.panel_ids = panel::panel_ids().unwrap_or_default();
-        shutdown::watch(Arc::clone(&applet.was_in_panel));
+        applet.panels.ids = panel::panel_ids().unwrap_or_default();
+        shutdown::watch(Arc::clone(&applet.panels.was_in));
         (applet, rescan())
     }
 
@@ -238,7 +243,7 @@ impl cosmic::Application for ThemeCycler {
                 .map(|update| Message::SettingsChanged(update.config)),
         ];
         // Read only: whether each panel still holds the applet.
-        for id in &self.panel_ids {
+        for id in &self.panels.ids {
             let id = id.clone();
             subscriptions.push(
                 cosmic_config::config_subscription::<_, PanelApplets>(
@@ -349,11 +354,8 @@ impl ThemeCycler {
             click_started: None,
             settings_stale: false,
             preview: Preview::default(),
-            panel_ids: Vec::new(),
-            in_panels: HashMap::new(),
-            was_in_panel: Arc::new(AtomicBool::new(false)),
+            panels: Panels::default(),
             tooltip_name: tooltip::Name::default(),
-            reverted: false,
             auto: auto::Auto::default(),
         };
         applet.auto.latitude_text =
@@ -560,40 +562,6 @@ impl ThemeCycler {
         self.write_waiting()
     }
 
-    /// Saves the settings in the background, if they can be saved.
-    fn save_settings(&self) {
-        if let Some(saver) = &self.saver {
-            saver.save(self.settings.clone());
-        }
-    }
-
-    /// The kind of the theme the applet applied last, if it is still listed.
-    fn shown_variant(&self) -> Option<Variant> {
-        let key = self.settings.last_applied.as_deref()?;
-        self.theme(key).map(|theme| theme.variant)
-    }
-
-    /// The user picked `key` by hand: it is the theme Auto applies for its
-    /// kind from now on, and a switch of kind is a data point for the
-    /// learner of the user's habitual switch times.
-    fn remember_choice(&mut self, key: &str, previous: Option<Variant>) {
-        let Some(variant) = self.theme(key).map(|theme| theme.variant) else {
-            return;
-        };
-        let slot = match variant {
-            Variant::Light => &mut self.settings.light_theme,
-            Variant::Dark => &mut self.settings.dark_theme,
-        };
-        *slot = Some(key.to_owned());
-        if self.settings.auto
-            && previous != Some(variant)
-            && let Some(record) = schedule::record_choice(self.place(), now_minutes(), variant)
-        {
-            habit::push(&mut self.settings.switch_history, record);
-        }
-        self.save_settings();
-    }
-
     /// Toggles a theme on or off for the cycle; the list doesn't move.
     fn select(&mut self, key: String, selected: bool) {
         let selection = &mut self.settings.selected;
@@ -784,7 +752,7 @@ impl ThemeCycler {
         match result {
             Ok(true) => {}
             // Still in a panel after all: watch on.
-            Ok(false) => self.reverted = false,
+            Ok(false) => self.panels.reverted = false,
             Err(error) => tracing::warn!(%error, "original theme not put back"),
         }
     }
@@ -794,20 +762,21 @@ impl ThemeCycler {
     /// panel must have reported, and the applet must have been seen in one,
     /// so nothing is put back while starting up.
     fn panel_changed(&mut self, id: String, holds: bool) -> Task<Message> {
-        self.in_panels.insert(id, holds);
+        self.panels.holds.insert(id, holds);
         if holds {
-            self.was_in_panel.store(true, Ordering::SeqCst);
+            self.panels.was_in.store(true, Ordering::SeqCst);
         }
         let all_reported = self
-            .panel_ids
+            .panels
+            .ids
             .iter()
-            .all(|id| self.in_panels.contains_key(id));
-        let in_none = self.in_panels.values().all(|holds| !holds);
-        let was_in_panel = self.was_in_panel.load(Ordering::SeqCst);
-        if self.reverted || !was_in_panel || !all_reported || !in_none {
+            .all(|id| self.panels.holds.contains_key(id));
+        let in_none = self.panels.holds.values().all(|holds| !holds);
+        let was_in_panel = self.panels.was_in.load(Ordering::SeqCst);
+        if self.panels.reverted || !was_in_panel || !all_reported || !in_none {
             return Task::none();
         }
-        self.reverted = true;
+        self.panels.reverted = true;
         cosmic::task::future(async {
             Message::Reverted(
                 background::run(|| {
@@ -946,13 +915,11 @@ fn theme_name(path: &std::path::Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use cosmic::Application as _;
     use cosmic::cosmic_theme::palette::Srgba;
 
-    use super::auto::{degrees_text, parse_degrees};
     use super::*;
 
-    fn theme(key: &str, builder: ThemeBuilder) -> Theme {
+    pub(super) fn theme(key: &str, builder: ThemeBuilder) -> Theme {
         Theme {
             key: key.to_owned(),
             name: key.to_owned(),
@@ -973,7 +940,7 @@ mod tests {
 
     /// Two dark and two light themes of different brightness, saving
     /// nothing: no saver, so no test touches the real settings.
-    fn applet(selected: &[&str]) -> ThemeCycler {
+    pub(super) fn applet(selected: &[&str]) -> ThemeCycler {
         let settings = Settings {
             selected: selected.iter().map(|&key| key.to_owned()).collect(),
             ..Settings::default()
@@ -1214,110 +1181,30 @@ mod tests {
     #[test]
     fn taken_out_of_every_panel_puts_the_original_back_once() {
         let mut applet = applet(&[]);
-        applet.panel_ids = vec!["panel".into(), "dock".into()];
+        applet.panels.ids = vec!["panel".into(), "dock".into()];
         // Starting up: one panel holds it, the other hasn't reported.
         let _ = applet.panel_changed("panel".into(), true);
         let _ = applet.panel_changed("dock".into(), false);
-        assert!(!applet.reverted);
+        assert!(!applet.panels.reverted);
         // Taken out.
         let _ = applet.panel_changed("panel".into(), false);
-        assert!(applet.reverted);
+        assert!(applet.panels.reverted);
     }
 
     #[test]
     fn nothing_is_put_back_before_every_panel_reported() {
         let mut applet = applet(&[]);
-        applet.panel_ids = vec!["panel".into(), "dock".into()];
+        applet.panels.ids = vec!["panel".into(), "dock".into()];
         let _ = applet.panel_changed("dock".into(), false);
-        assert!(!applet.reverted);
+        assert!(!applet.panels.reverted);
     }
 
     #[test]
     fn run_outside_any_panel_nothing_is_put_back() {
         let mut applet = applet(&[]);
-        applet.panel_ids = vec!["panel".into()];
+        applet.panels.ids = vec!["panel".into()];
         let _ = applet.panel_changed("panel".into(), false);
-        assert!(!applet.reverted);
-    }
-
-    #[test]
-    fn typed_degrees_are_checked_and_shown_back() {
-        assert_eq!(parse_degrees(" 51.5 ", 90), Some(51_500));
-        assert_eq!(parse_degrees("-0,25", 90), Some(-250));
-        for bad in ["", "abc", "91", "-90.001", "NaN", "inf", "1e400"] {
-            assert_eq!(parse_degrees(bad, 90), None, "{bad}");
-        }
-        assert_eq!(parse_degrees("180", 180), Some(180_000));
-        assert_eq!(degrees_text(Some(51_500)), "51.5");
-        assert_eq!(degrees_text(Some(-250)), "-0.25");
-        assert_eq!(degrees_text(Some(100_000)), "100");
-        assert_eq!(degrees_text(Some(i32::MIN)), "-2147483.648");
-        assert_eq!(degrees_text(None), "");
-    }
-
-    #[test]
-    fn a_place_needs_both_boxes_and_empty_boxes_clear_it() {
-        let mut applet = applet(&[]);
-        let _ = applet.update(Message::Latitude("51.5".into()));
-        assert_eq!(applet.settings.place_milli(), None, "half typed");
-        let _ = applet.update(Message::Longitude("-0.12".into()));
-        assert_eq!(applet.settings.place_milli(), Some((51_500, -120)));
-        let _ = applet.update(Message::Longitude("200".into()));
-        assert_eq!(applet.settings.place_milli(), Some((51_500, -120)), "kept");
-        let _ = applet.update(Message::Latitude(String::new()));
-        let _ = applet.update(Message::Longitude(String::new()));
-        assert_eq!(applet.settings.place_milli(), None);
-    }
-
-    #[test]
-    fn a_manual_pick_is_remembered_for_its_kind() {
-        let mut applet = applet(&["grey-dark"]);
-        let _ = applet.next();
-        let _ = applet.applied("grey-dark", Ok(()));
-        assert_eq!(applet.settings.dark_theme.as_deref(), Some("grey-dark"));
-        assert_eq!(applet.settings.light_theme, None);
-        assert!(applet.settings.switch_history.is_empty(), "Auto is off");
-    }
-
-    #[test]
-    fn auto_applies_the_remembered_theme_for_the_period_once() {
-        let mut applet = applet(&["dim-dark"]);
-        applet.settings.light_theme = Some("pale-light".into());
-        applet.settings.dark_theme = Some("grey-dark".into());
-        let _ = applet.update(Message::SetAuto(true));
-        assert!(applet.settings.auto);
-        assert!(applet.writing, "the theme for the time of day is written");
-        let wanted = applet.auto.period.expect("a period was chosen");
-        let key = match wanted {
-            Variant::Light => "pale-light",
-            Variant::Dark => "grey-dark",
-        };
-        let _ = applet.applied(key, Ok(()));
-        assert_eq!(applet.settings.last_applied.as_deref(), Some(key));
-        // Not a manual pick: nothing remembered or learned from it.
-        assert_eq!(applet.settings.light_theme.as_deref(), Some("pale-light"));
-        let _ = applet.update(Message::AutoTick);
-        assert!(!applet.writing, "once per period");
-    }
-
-    #[test]
-    fn auto_falls_back_to_a_toggled_theme_of_the_kind_and_off_does_nothing() {
-        let mut applet = applet(&["grey-light", "grey-dark"]);
-        assert_eq!(
-            applet.auto_theme(Variant::Light).as_deref(),
-            Some("grey-light")
-        );
-        assert_eq!(
-            applet.auto_theme(Variant::Dark).as_deref(),
-            Some("grey-dark")
-        );
-        applet.settings.light_theme = Some("gone".into());
-        assert_eq!(
-            applet.auto_theme(Variant::Light).as_deref(),
-            Some("grey-light")
-        );
-        let _ = applet.update(Message::AutoTick);
-        assert!(!applet.writing, "Auto is off");
+        assert!(!applet.panels.reverted);
     }
 
     #[test]
