@@ -3,6 +3,7 @@
 //! - [`library`]: finding, reading and importing theme files.
 //! - [`builtin`]: the themes that come with the applet.
 //! - [`cycle`]: which theme comes next.
+//! - [`habit`]: the user's habitual light/dark switch times.
 //! - [`settings`]: the applet's saved settings, through cosmic-config.
 //! - [`panel`]: whether the applet is still in a panel.
 //! - [`solar`]: sunrise/sunset and a smooth day curve.
@@ -14,6 +15,7 @@
 
 pub mod builtin;
 pub mod cycle;
+pub mod habit;
 pub mod library;
 pub mod migrate;
 pub mod panel;

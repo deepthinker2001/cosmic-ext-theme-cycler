@@ -40,6 +40,9 @@ pub struct Settings {
     /// The key of the theme the applet applied last, which the cycle moves
     /// on from, kept across restarts.
     pub last_applied: Option<String>,
+    /// The user's manual light/dark choices, oldest first, bounded by
+    /// [`crate::habit::MAX_HISTORY`]. Absent in older files: empty.
+    pub switch_history: Vec<crate::habit::SwitchRecord>,
 }
 
 impl Settings {
@@ -59,6 +62,7 @@ impl Settings {
         Self {
             selected: unique_keys(&self.selected),
             last_applied: self.last_applied.clone().filter(|key| !key.is_empty()),
+            switch_history: crate::habit::clamp_history(&self.switch_history),
         }
     }
 
@@ -158,6 +162,7 @@ mod tests {
         let settings = Settings {
             selected: keys(&["system:a", "system:a", "user:b"]),
             last_applied: Some(String::new()),
+            ..Settings::default()
         };
         let clamped = settings.clamped();
         assert_eq!(clamped.selected, keys(&["system:a", "user:b"]));
@@ -172,6 +177,10 @@ mod tests {
         let settings = Settings {
             selected: keys(&["system:nebula-dark", "user:my theme"]),
             last_applied: Some("user:my theme".into()),
+            switch_history: vec![crate::habit::SwitchRecord {
+                variant: crate::Variant::Dark,
+                offset_minutes: -15,
+            }],
         };
         settings.save(&config).unwrap();
         assert_eq!(Settings::load(&config), settings);
@@ -183,6 +192,7 @@ mod tests {
         let settings = Settings {
             selected: keys(&["system:a"]),
             last_applied: Some("system:a".into()),
+            ..Settings::default()
         };
         settings.save(&config).unwrap();
         let folder = root.path().join("cosmic").join(APP_ID).join("v1");
@@ -192,6 +202,10 @@ mod tests {
         let loaded = Settings::load(&config);
         assert_eq!(loaded.last_applied, None, "unreadable key at its default");
         assert_eq!(loaded.selected, keys(&["a", "b"]), "other keys kept");
+        assert!(
+            loaded.switch_history.is_empty(),
+            "a key added later defaults"
+        );
     }
 
     #[test]
