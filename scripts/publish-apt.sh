@@ -45,7 +45,7 @@ gzip -9 -n -k -f "$dist/main/binary-amd64/Packages"
 rm -f "$dist/Release" "$dist/InRelease" "$dist/Release.gpg"
 apt-ftparchive \
     -o APT::FTPArchive::Release::Origin=deepthinker2001 \
-    -o APT::FTPArchive::Release::Label="Theme Cycler for COSMIC" \
+    -o APT::FTPArchive::Release::Label="COSMIC Theme Cycler" \
     -o APT::FTPArchive::Release::Suite=stable \
     -o APT::FTPArchive::Release::Codename=stable \
     -o APT::FTPArchive::Release::Architectures=amd64 \

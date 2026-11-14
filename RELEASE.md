@@ -80,7 +80,7 @@ drops the waiting one, and it has to be rerun by hand.
 
 The apt repository is signed with the key
 `1B33 3041 54C2 8AB6 0EC9 F8ED BEF9 D28E 08BD A02A`
-("deepthinker2001 (Theme Cycler for COSMIC apt repository)"). The workflow reads
+("deepthinker2001 (COSMIC Theme Cycler apt repository)"). The workflow reads
 it from the repository secret `APT_SIGNING_KEY`, and its fingerprint from the
 repository variable `APT_SIGNING_KEY_ID`. Its public half is served as
 `key.gpg` on GitHub Pages.
