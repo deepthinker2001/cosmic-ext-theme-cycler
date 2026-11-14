@@ -595,6 +595,10 @@ mod tests {
                 "user:ünïcode \"quoted\"".into(),
             ],
             last_applied: Some("system:nebula-dark".into()),
+            switch_history: vec![cycler_core::habit::SwitchRecord {
+                variant: cycler_core::Variant::Light,
+                offset_minutes: 15,
+            }],
         };
         assert_same_as_cosmic_config(&settings, "settings", 1);
     }
