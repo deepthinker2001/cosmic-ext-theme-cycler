@@ -43,7 +43,27 @@ pub struct Settings {
     /// The user's manual light/dark choices, oldest first, bounded by
     /// [`crate::habit::MAX_HISTORY`]. Absent in older files: empty.
     pub switch_history: Vec<crate::habit::SwitchRecord>,
+    /// Whether the applet switches between the light and dark theme by the
+    /// time of day (the Auto toggle). Absent in older files: off.
+    pub auto: bool,
+    /// The user's place, as thousandths of a degree (north positive); only
+    /// set together with `longitude_milli`. `None`: estimated from the time
+    /// zone. Whole numbers keep the settings comparable with `Eq`.
+    pub latitude_milli: Option<i32>,
+    /// The user's place, thousandths of a degree east.
+    pub longitude_milli: Option<i32>,
+    /// The theme Auto applies after sunup: the last light theme the user
+    /// picked by hand.
+    pub light_theme: Option<String>,
+    /// The theme Auto applies after sunset: the last dark theme picked by
+    /// hand.
+    pub dark_theme: Option<String>,
 }
+
+/// The largest latitude in [`Settings::latitude_milli`] (90 degrees).
+pub const MAX_LATITUDE_MILLI: i32 = 90_000;
+/// The largest longitude in [`Settings::longitude_milli`] (180 degrees).
+pub const MAX_LONGITUDE_MILLI: i32 = 180_000;
 
 impl Settings {
     /// The cosmic-config namespace the settings live in.
@@ -59,11 +79,29 @@ impl Settings {
     /// empty or repeated keys, and no empty last key.
     #[must_use]
     pub fn clamped(&self) -> Self {
+        let place = self.place_milli();
         Self {
             selected: unique_keys(&self.selected),
             last_applied: self.last_applied.clone().filter(|key| !key.is_empty()),
             switch_history: crate::habit::clamp_history(&self.switch_history),
+            auto: self.auto,
+            latitude_milli: place.map(|(latitude, _)| latitude),
+            longitude_milli: place.map(|(_, longitude)| longitude),
+            light_theme: self.light_theme.clone().filter(|key| !key.is_empty()),
+            dark_theme: self.dark_theme.clone().filter(|key| !key.is_empty()),
         }
+    }
+
+    /// The saved place in thousandths of a degree, if both halves are there
+    /// and in range (a half-set or out-of-range place counts as unset).
+    /// Settings are untrusted input, so the bounds are range checks.
+    #[must_use]
+    pub fn place_milli(&self) -> Option<(i32, i32)> {
+        let latitude = self.latitude_milli?;
+        let longitude = self.longitude_milli?;
+        ((-MAX_LATITUDE_MILLI..=MAX_LATITUDE_MILLI).contains(&latitude)
+            && (-MAX_LONGITUDE_MILLI..=MAX_LONGITUDE_MILLI).contains(&longitude))
+        .then_some((latitude, longitude))
     }
 
     /// Load from the applet's config, falling back to defaults key by key;
@@ -181,6 +219,11 @@ mod tests {
                 variant: crate::Variant::Dark,
                 offset_minutes: -15,
             }],
+            auto: true,
+            latitude_milli: Some(51_500),
+            longitude_milli: Some(-120),
+            light_theme: Some("system:comet-light".into()),
+            dark_theme: Some("user:my theme".into()),
         };
         settings.save(&config).unwrap();
         assert_eq!(Settings::load(&config), settings);
@@ -206,6 +249,35 @@ mod tests {
             loaded.switch_history.is_empty(),
             "a key added later defaults"
         );
+    }
+
+    #[test]
+    fn a_bad_place_is_dropped_whole() {
+        let at = |latitude_milli, longitude_milli| {
+            Settings {
+                latitude_milli,
+                longitude_milli,
+                ..Settings::default()
+            }
+            .clamped()
+        };
+        assert_eq!(
+            at(Some(90_000), Some(-180_000)).place_milli(),
+            Some((90_000, -180_000))
+        );
+        for (lat, lon) in [
+            (Some(90_001), Some(0)),
+            (Some(0), Some(i32::MIN)),
+            (Some(i32::MIN), Some(0)),
+            (Some(0), None),
+            (None, Some(0)),
+        ] {
+            let clamped = at(lat, lon);
+            assert_eq!(
+                (clamped.latitude_milli, clamped.longitude_milli),
+                (None, None)
+            );
+        }
     }
 
     #[test]

@@ -37,6 +37,9 @@ use cycler_core::library::{self, LibraryError, Scan, Source, Theme};
 use cycler_core::panel::{self, PanelApplets};
 use cycler_core::settings::{CONFIG_VERSION, Settings};
 
+mod auto;
+mod preview;
+
 use crate::saver::Saver;
 use crate::{APP_ID, ICON, apply, background, fl, restore, shutdown, tooltip};
 
@@ -49,6 +52,7 @@ const DWELL: Duration = Duration::from_millis(200);
 /// applet; its key is `original:theme`.
 const ORIGINAL_STEM: &str = "theme";
 
+#[allow(clippy::struct_excessive_bools)] // independent flags of a UI state machine
 pub struct ThemeCycler {
     pub(crate) core: Core,
     /// The open popup, if any.
@@ -73,17 +77,27 @@ pub struct ThemeCycler {
     /// was set aside; it is read again once the saver is idle.
     settings_stale: bool,
     pub(crate) preview: Preview,
-    /// Each panel's config ID, to watch for the applet being removed.
-    panel_ids: Vec<String>,
-    /// Whether each panel (by config ID) holds the applet, as last read.
-    in_panels: HashMap<String, bool>,
-    /// The applet has been seen in a panel; until then (run on its own,
-    /// say) not being in one means nothing. Shared with the thread that
-    /// puts the original back when the panel stops the applet.
-    was_in_panel: Arc<AtomicBool>,
+    /// The panels and whether they hold the applet.
+    panels: Panels,
     /// The tooltip's text, shared with its popup so an open tooltip
     /// follows a click.
     tooltip_name: tooltip::Name,
+    /// Auto's state (auto.rs).
+    pub(crate) auto: auto::Auto,
+}
+
+/// Which panels hold the applet, to put the original theme back when it is
+/// taken out of them all.
+#[derive(Debug, Default)]
+struct Panels {
+    /// Each panel's config ID, to watch for the applet being removed.
+    ids: Vec<String>,
+    /// Whether each panel (by config ID) holds the applet, as last read.
+    holds: HashMap<String, bool>,
+    /// The applet has been seen in a panel; until then (run on its own,
+    /// say) not being in one means nothing. Shared with the thread that
+    /// puts the original back when the panel stops the applet.
+    was_in: Arc<AtomicBool>,
     /// The original theme is being, or has been, put back after the applet
     /// was taken out of the panel.
     reverted: bool,
@@ -181,6 +195,14 @@ pub enum Message {
     PanelChanged(String, bool),
     /// The original theme was put back after the applet's removal.
     Reverted(Result<bool, String>),
+    /// The Auto toggle.
+    SetAuto(bool),
+    /// Auto's timer: look at the time of day.
+    AutoTick,
+    /// The latitude box changed.
+    Latitude(String),
+    /// The longitude box changed.
+    Longitude(String),
 }
 
 impl cosmic::Application for ThemeCycler {
@@ -206,8 +228,8 @@ impl cosmic::Application for ThemeCycler {
             .and(restore::Where::System.folder(APP_ID, CONFIG_VERSION))
             .map(|folder| Saver::start(folder, &settings));
         let mut applet = Self::new(core, saver, settings);
-        applet.panel_ids = panel::panel_ids().unwrap_or_default();
-        shutdown::watch(Arc::clone(&applet.was_in_panel));
+        applet.panels.ids = panel::panel_ids().unwrap_or_default();
+        shutdown::watch(Arc::clone(&applet.panels.was_in));
         (applet, rescan())
     }
 
@@ -222,7 +244,7 @@ impl cosmic::Application for ThemeCycler {
                 .map(|update| Message::SettingsChanged(update.config)),
         ];
         // Read only: whether each panel still holds the applet.
-        for id in &self.panel_ids {
+        for id in &self.panels.ids {
             let id = id.clone();
             subscriptions.push(
                 cosmic_config::config_subscription::<_, PanelApplets>(
@@ -233,6 +255,9 @@ impl cosmic::Application for ThemeCycler {
                 .with(id)
                 .map(|(id, update)| Message::PanelChanged(id, update.config.holds(APP_ID))),
             );
+        }
+        if self.settings.auto {
+            subscriptions.push(iced::time::every(auto::EVERY).map(|_| Message::AutoTick));
         }
         if self.settings_stale {
             subscriptions
@@ -254,7 +279,7 @@ impl cosmic::Application for ThemeCycler {
             Message::Surface(action) => return surface_task(action),
             Message::Scanned(scan) => return self.scanned(scan),
             Message::Select(key, selected) => self.select(key, selected),
-            Message::Applied(key, result) => return self.applied(key, result),
+            Message::Applied(key, result) => return self.applied(&key, result),
             Message::Import => return choose_import(),
             Message::ImportChosen(path) => return path.map_or_else(Task::none, import),
             Message::Imported(result) => return self.imported(result),
@@ -269,6 +294,16 @@ impl cosmic::Application for ThemeCycler {
             Message::Previewed(result) => return self.previewed(result),
             Message::PanelChanged(id, holds) => return self.panel_changed(id, holds),
             Message::Reverted(result) => self.reverted(result),
+            Message::SetAuto(on) => return self.set_auto(on),
+            Message::AutoTick => return self.auto_tick(),
+            Message::Latitude(text) => {
+                self.auto.latitude_text = text;
+                return self.place_typed();
+            }
+            Message::Longitude(text) => {
+                self.auto.longitude_text = text;
+                return self.place_typed();
+            }
         }
         Task::none()
     }
@@ -308,7 +343,7 @@ impl ThemeCycler {
     /// The applet before anything has been read from disk; `saver` writes
     /// the settings (`None` in tests, so nothing is saved).
     pub(crate) fn new(core: Core, saver: Option<Saver>, settings: Settings) -> Self {
-        let applet = Self {
+        let mut applet = Self {
             core,
             popup: None,
             saver,
@@ -320,12 +355,14 @@ impl ThemeCycler {
             click_started: None,
             settings_stale: false,
             preview: Preview::default(),
-            panel_ids: Vec::new(),
-            in_panels: HashMap::new(),
-            was_in_panel: Arc::new(AtomicBool::new(false)),
+            panels: Panels::default(),
             tooltip_name: tooltip::Name::default(),
-            reverted: false,
+            auto: auto::Auto::default(),
         };
+        applet.auto.latitude_text =
+            auto::degrees_text(applet.settings.place_milli().map(|(lat, _)| lat));
+        applet.auto.longitude_text =
+            auto::degrees_text(applet.settings.place_milli().map(|(_, lon)| lon));
         applet.sync_tooltip();
         applet
     }
@@ -358,7 +395,8 @@ impl ThemeCycler {
             self.scan = scan;
         }
         self.sync_tooltip();
-        self.click_if_waiting()
+        // A click first; Auto waits while its write runs.
+        Task::batch([self.click_if_waiting(), self.auto_tick()])
     }
 
     fn toggle_popup(&mut self) -> Task<Message> {
@@ -460,7 +498,7 @@ impl ThemeCycler {
             let key = key.to_owned();
             // The click's write puts any preview's original back first.
             self.preview.waiting = None;
-            return self.apply_key(key);
+            return self.apply_key(key, false);
         }
         self.click_started = None;
         self.notice = Some(Notice::NoneSelected);
@@ -477,12 +515,13 @@ impl ThemeCycler {
     }
 
     /// Writes the theme `key` names to the desktop, off the UI thread.
-    fn apply_key(&mut self, key: String) -> Task<Message> {
+    fn apply_key(&mut self, key: String, auto: bool) -> Task<Message> {
         let Some(builder) = self.theme(&key).map(|theme| theme.builder.clone()) else {
             return Task::none();
         };
         let original = self.preview.original.clone();
         self.writing = true;
+        self.auto.applying = auto;
         cosmic::task::future(async move {
             let applied_key = key.clone();
             let result =
@@ -493,8 +532,9 @@ impl ThemeCycler {
         })
     }
 
-    fn applied(&mut self, key: String, result: Result<(), String>) -> Task<Message> {
+    fn applied(&mut self, key: &str, result: Result<(), String>) -> Task<Message> {
         self.writing = false;
+        let by_auto = std::mem::take(&mut self.auto.applying);
         if let Some(started) = self.click_started.take() {
             tracing::debug!(theme = %key, elapsed = ?started.elapsed(), "click handled");
         }
@@ -502,13 +542,23 @@ impl ThemeCycler {
             Ok(()) => {
                 self.notice = None;
                 // `apply` saved it, holding the lock, ordered with --restore.
-                self.settings.last_applied = Some(key);
+                let previous = self.shown_variant();
+                self.settings.last_applied = Some(key.to_owned());
+                if !by_auto {
+                    self.remember_choice(key, previous);
+                }
                 self.sync_tooltip();
                 // Any preview is over: its original was put back first.
                 self.clear_preview();
             }
             // A preview's original is kept, so closing the list puts it back.
-            Err(error) => self.notice = Some(Notice::ApplyFailed(error)),
+            Err(error) => {
+                if by_auto {
+                    // Try again at the next tick.
+                    self.auto.period = None;
+                }
+                self.notice = Some(Notice::ApplyFailed(error));
+            }
         }
         self.write_waiting()
     }
@@ -564,119 +614,6 @@ impl ThemeCycler {
         rescan()
     }
 
-    /// The pointer entered a theme's row (`Some`) or left one (`None`):
-    /// after a short dwell, show it or put back what was there.
-    fn pointer_moved(&mut self, key: Option<String>) -> Task<Message> {
-        self.preview.generation += 1;
-        let generation = self.preview.generation;
-        after(DWELL, Message::PreviewDue(generation, key))
-    }
-
-    fn preview_due(&mut self, generation: u64, key: Option<String>) -> Task<Message> {
-        if generation != self.preview.generation {
-            return Task::none();
-        }
-        match (key, self.preview.original.is_some()) {
-            // Already previewing: show this one instead.
-            (Some(key), true) => match self.theme(&key).map(|theme| theme.builder.clone()) {
-                Some(builder) => self.show(builder),
-                None => Task::none(),
-            },
-            // A write is running: wait for it, so what is read next isn't
-            // half written.
-            (Some(key), false) if self.writing => {
-                after(DWELL, Message::PreviewDue(generation, Some(key)))
-            }
-            // A new preview: first read what COSMIC shows, to put it back.
-            (Some(key), false) => cosmic::task::future(async move {
-                let shown = background::run(|| apply::shown().map(Box::new))
-                    .await
-                    .unwrap_or_else(|| Err(fl!("apply-crashed")));
-                Message::PreviewStart(generation, key, shown)
-            }),
-            (None, true) => self.end_preview(),
-            (None, false) => Task::none(),
-        }
-    }
-
-    fn preview_start(
-        &mut self,
-        generation: u64,
-        key: &str,
-        shown: Result<Box<apply::Shown>, String>,
-    ) -> Task<Message> {
-        if generation != self.preview.generation {
-            return Task::none();
-        }
-        let (Ok(shown), Some(builder)) =
-            (shown, self.theme(key).map(|theme| theme.builder.clone()))
-        else {
-            return Task::none();
-        };
-        self.preview.original = Some(shown);
-        self.preview.written = false;
-        self.show(builder)
-    }
-
-    /// Shows a hovered theme, after any write still running.
-    fn show(&mut self, builder: ThemeBuilder) -> Task<Message> {
-        if self.writing {
-            self.preview.waiting = Some(Pending::Show(Box::new(builder)));
-            return Task::none();
-        }
-        self.writing = true;
-        let continuing = std::mem::replace(&mut self.preview.written, true);
-        cosmic::task::future(async move {
-            let result = background::run(move || apply::preview(&builder, continuing))
-                .await
-                .unwrap_or_else(|| Err(fl!("apply-crashed")));
-            Message::Previewed(result)
-        })
-    }
-
-    /// Puts back what was shown before the preview, after any write still
-    /// running; the preview is over only once that has worked.
-    fn end_preview(&mut self) -> Task<Message> {
-        let Some(original) = self.preview.original.clone() else {
-            return Task::none();
-        };
-        // No more dwells from before.
-        self.preview.generation += 1;
-        if self.writing {
-            self.preview.waiting = Some(Pending::PutBack);
-            return Task::none();
-        }
-        self.writing = true;
-        self.preview.putting_back = true;
-        cosmic::task::future(async move {
-            let result = background::run(move || apply::put_back(&original))
-                .await
-                .unwrap_or_else(|| Err(fl!("apply-crashed")));
-            Message::Previewed(result)
-        })
-    }
-
-    fn previewed(&mut self, result: Result<bool, String>) -> Task<Message> {
-        self.writing = false;
-        let putting_back = std::mem::take(&mut self.preview.putting_back);
-        match result {
-            // Put back, or --restore ran meanwhile: the preview is over.
-            Ok(true) if putting_back => self.clear_preview(),
-            Ok(true) => {}
-            Ok(false) => self.clear_preview(),
-            // The original is kept, so leaving or closing tries again.
-            Err(error) => self.notice = Some(Notice::ApplyFailed(error)),
-        }
-        self.write_waiting()
-    }
-
-    fn clear_preview(&mut self) {
-        self.preview = Preview {
-            generation: self.preview.generation + 1,
-            ..Preview::default()
-        };
-    }
-
     /// A click or write that came while another write ran.
     fn write_waiting(&mut self) -> Task<Message> {
         if self.click_waiting.is_some() {
@@ -703,7 +640,7 @@ impl ThemeCycler {
         match result {
             Ok(true) => {}
             // Still in a panel after all: watch on.
-            Ok(false) => self.reverted = false,
+            Ok(false) => self.panels.reverted = false,
             Err(error) => tracing::warn!(%error, "original theme not put back"),
         }
     }
@@ -713,20 +650,21 @@ impl ThemeCycler {
     /// panel must have reported, and the applet must have been seen in one,
     /// so nothing is put back while starting up.
     fn panel_changed(&mut self, id: String, holds: bool) -> Task<Message> {
-        self.in_panels.insert(id, holds);
+        self.panels.holds.insert(id, holds);
         if holds {
-            self.was_in_panel.store(true, Ordering::SeqCst);
+            self.panels.was_in.store(true, Ordering::SeqCst);
         }
         let all_reported = self
-            .panel_ids
+            .panels
+            .ids
             .iter()
-            .all(|id| self.in_panels.contains_key(id));
-        let in_none = self.in_panels.values().all(|holds| !holds);
-        let was_in_panel = self.was_in_panel.load(Ordering::SeqCst);
-        if self.reverted || !was_in_panel || !all_reported || !in_none {
+            .all(|id| self.panels.holds.contains_key(id));
+        let in_none = self.panels.holds.values().all(|holds| !holds);
+        let was_in_panel = self.panels.was_in.load(Ordering::SeqCst);
+        if self.panels.reverted || !was_in_panel || !all_reported || !in_none {
             return Task::none();
         }
-        self.reverted = true;
+        self.panels.reverted = true;
         cosmic::task::future(async {
             Message::Reverted(
                 background::run(|| {
@@ -869,7 +807,7 @@ mod tests {
 
     use super::*;
 
-    fn theme(key: &str, builder: ThemeBuilder) -> Theme {
+    pub(super) fn theme(key: &str, builder: ThemeBuilder) -> Theme {
         Theme {
             key: key.to_owned(),
             name: key.to_owned(),
@@ -890,7 +828,7 @@ mod tests {
 
     /// Two dark and two light themes of different brightness, saving
     /// nothing: no saver, so no test touches the real settings.
-    fn applet(selected: &[&str]) -> ThemeCycler {
+    pub(super) fn applet(selected: &[&str]) -> ThemeCycler {
         let settings = Settings {
             selected: selected.iter().map(|&key| key.to_owned()).collect(),
             ..Settings::default()
@@ -962,7 +900,7 @@ mod tests {
         let tooltip = |applet: &ThemeCycler| applet.tooltip_name.read().unwrap().clone();
         assert_eq!(tooltip(&applet), fl!("applet-name"));
         let _ = applet.next();
-        let _ = applet.applied("grey-dark".into(), Ok(()));
+        let _ = applet.applied("grey-dark", Ok(()));
         assert_eq!(tooltip(&applet), "grey-dark");
     }
 
@@ -980,13 +918,13 @@ mod tests {
         // The task is built but never run, so nothing is written.
         let _ = applet.next();
         assert!(applet.writing);
-        let _ = applet.applied("grey-light".into(), Err("no config folder".into()));
+        let _ = applet.applied("grey-light", Err("no config folder".into()));
         assert_eq!(applet.settings.last_applied, None);
         assert_eq!(
             applet.notice,
             Some(Notice::ApplyFailed("no config folder".into()))
         );
-        let _ = applet.applied("grey-light".into(), Ok(()));
+        let _ = applet.applied("grey-light", Ok(()));
         assert_eq!(applet.settings.last_applied.as_deref(), Some("grey-light"));
         assert_eq!(applet.notice, None);
     }
@@ -1079,10 +1017,10 @@ mod tests {
         let _ = applet.next();
         assert!(applet.preview.generation > generation, "no more dwells");
         assert!(applet.preview.original.is_some());
-        let _ = applet.applied("grey-dark".into(), Err("disk full".into()));
+        let _ = applet.applied("grey-dark", Err("disk full".into()));
         assert!(applet.preview.original.is_some(), "can still be put back");
         let _ = applet.next();
-        let _ = applet.applied("grey-dark".into(), Ok(()));
+        let _ = applet.applied("grey-dark", Ok(()));
         assert!(applet.preview.original.is_none());
     }
 
@@ -1094,13 +1032,13 @@ mod tests {
         let _ = applet.next();
         let _ = applet.next();
         assert!(applet.click_waiting.is_some(), "not dropped");
-        let _ = applet.applied("grey-dark".into(), Ok(()));
+        let _ = applet.applied("grey-dark", Ok(()));
         assert!(applet.writing, "the waiting click is written next");
         assert!(
             applet.click_waiting.is_none(),
             "the clicks that waited count as one"
         );
-        let _ = applet.applied("dim-dark".into(), Ok(()));
+        let _ = applet.applied("dim-dark", Ok(()));
         assert!(!applet.writing);
         assert_eq!(applet.settings.last_applied.as_deref(), Some("dim-dark"));
     }
@@ -1131,30 +1069,30 @@ mod tests {
     #[test]
     fn taken_out_of_every_panel_puts_the_original_back_once() {
         let mut applet = applet(&[]);
-        applet.panel_ids = vec!["panel".into(), "dock".into()];
+        applet.panels.ids = vec!["panel".into(), "dock".into()];
         // Starting up: one panel holds it, the other hasn't reported.
         let _ = applet.panel_changed("panel".into(), true);
         let _ = applet.panel_changed("dock".into(), false);
-        assert!(!applet.reverted);
+        assert!(!applet.panels.reverted);
         // Taken out.
         let _ = applet.panel_changed("panel".into(), false);
-        assert!(applet.reverted);
+        assert!(applet.panels.reverted);
     }
 
     #[test]
     fn nothing_is_put_back_before_every_panel_reported() {
         let mut applet = applet(&[]);
-        applet.panel_ids = vec!["panel".into(), "dock".into()];
+        applet.panels.ids = vec!["panel".into(), "dock".into()];
         let _ = applet.panel_changed("dock".into(), false);
-        assert!(!applet.reverted);
+        assert!(!applet.panels.reverted);
     }
 
     #[test]
     fn run_outside_any_panel_nothing_is_put_back() {
         let mut applet = applet(&[]);
-        applet.panel_ids = vec!["panel".into()];
+        applet.panels.ids = vec!["panel".into()];
         let _ = applet.panel_changed("panel".into(), false);
-        assert!(!applet.reverted);
+        assert!(!applet.panels.reverted);
     }
 
     #[test]

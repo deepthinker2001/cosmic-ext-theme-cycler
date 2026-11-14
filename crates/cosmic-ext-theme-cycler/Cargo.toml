@@ -52,6 +52,8 @@ i18n-embed-fl.workspace = true
 libcosmic = { workspace = true, features = ["xdg-portal"] }
 # O_NONBLOCK, so reading the --restore snapshot can't hang on a named pipe.
 libc = "0.2.191"
+# The local time and its offset from UTC, for Auto (the sun times need both).
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 ron.workspace = true
 rust-embed.workspace = true
 # The --restore snapshot's format.

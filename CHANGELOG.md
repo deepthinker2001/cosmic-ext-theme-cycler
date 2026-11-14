@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- New **Auto** toggle in the right-click list: the light theme you last
+  picked is applied after sunup and the dark one after sunset. Set your
+  latitude and longitude there, or leave them empty to use an estimate from
+  your time zone; the applet never uses the network for this. Themes you
+  switch by hand while Auto is on teach it your usual switch times. The
+  settings are saved with the others.
+
 ## 0.2.0
 
 - Renamed from `cosmic-theme-cycler` to `cosmic-ext-theme-cycler`, following

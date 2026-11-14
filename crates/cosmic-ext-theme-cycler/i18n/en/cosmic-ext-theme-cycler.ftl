@@ -14,6 +14,12 @@ import = Import theme…
 import-title = Import a COSMIC theme
 theme-files = COSMIC themes
 
+auto = Auto: light by day, dark by night
+latitude = Latitude
+longitude = Longitude
+place-entered = Using the place you entered. Nothing is sent over the network.
+place-estimated = No place entered: estimated from your time zone. Enter your latitude and longitude for exact sunrise and sunset.
+
 none-selected = Turn on some themes to cycle through.
 apply-failed = Theme not applied: { $error }
 apply-crashed = the work stopped unexpectedly
