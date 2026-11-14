@@ -17,7 +17,7 @@ beside stock COSMIC without replacing any of its components.
 
 ## Status
 
-**0.2.0.** In daily use on Pop!_OS 24.04 with COSMIC
+**0.3.0.** In daily use on Pop!_OS 24.04 with COSMIC
 epoch-1.11.0, the release it is built against. The design is in
 [docs/applet.md](docs/applet.md); the changes in each release are under
 [Changelog](#changelog) below.
