@@ -1,4 +1,4 @@
-# COSMIC Theme Cycler
+# Theme Cycler for COSMIC
 
 A standalone panel applet for the Pop!_OS COSMIC desktop that cycles the
 desktop theme through the COSMIC themes you choose (`cosmic-ext-theme-cycler`).
@@ -7,7 +7,7 @@ match). It keeps your Interface density, roundness, window gaps, window hint
 and frosted glass as they are, never touches the wallpaper, and installs
 beside stock COSMIC without replacing any of its components.
 
-> **Not an official COSMIC project.** COSMIC Theme Cycler is an independent,
+> **Not an official COSMIC project.** Theme Cycler for COSMIC is an independent,
 > community-made applet. It is not made, endorsed, sponsored or supported by
 > System76. COSMIC and Pop!_OS are trademarks of System76, used here only to
 > say which desktop the applet works with. Please report problems
@@ -201,7 +201,7 @@ results of its security review, and how to report a problem.
 
 ## How it was made
 
-COSMIC Theme Cycler was built using AI. The code, tests and documentation
+Theme Cycler for COSMIC was built using AI. The code, tests and documentation
 were written with AI assistance, and the code and security reviews before
 each change were AI-assisted too. The author set the requirements, made the
 design decisions, tested every behaviour on a real COSMIC desktop, and

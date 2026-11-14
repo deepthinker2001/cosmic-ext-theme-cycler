@@ -50,7 +50,7 @@ apt-ftparchive \
     -o APT::FTPArchive::Release::Codename=stable \
     -o APT::FTPArchive::Release::Architectures=amd64 \
     -o APT::FTPArchive::Release::Components=main \
-    -o APT::FTPArchive::Release::Description="COSMIC Theme Cycler for Pop!_OS COSMIC" \
+    -o APT::FTPArchive::Release::Description="Theme Cycler for COSMIC on Pop!_OS" \
     release "$dist" > Release.new
 mv Release.new "$dist/Release"
 

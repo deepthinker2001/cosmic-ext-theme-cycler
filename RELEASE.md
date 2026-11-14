@@ -33,7 +33,7 @@ the workflow refuses a mismatch.
 From a terminal, with the notes in a file (the changelog section works well):
 
 ```sh
-gh release create v0.2.0 --target main --title "COSMIC Theme Cycler 0.2.0" --notes-file notes.md
+gh release create v0.2.0 --target main --title "Theme Cycler for COSMIC 0.2.0" --notes-file notes.md
 ```
 
 Or on GitHub: **Releases → Draft a new release**, create the tag `v0.2.0` on
