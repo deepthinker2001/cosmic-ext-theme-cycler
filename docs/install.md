@@ -1,6 +1,6 @@
-# Installing COSMIC Theme Cycler
+# Installing Theme Cycler for COSMIC
 
-> **Not an official COSMIC project.** COSMIC Theme Cycler is an independent,
+> **Not an official COSMIC project.** Theme Cycler for COSMIC is an independent,
 > community-made applet. It is not made, endorsed, sponsored or supported by
 > System76. COSMIC and Pop!_OS are trademarks of System76, used here only to
 > say which desktop the applet works with. Please report problems
