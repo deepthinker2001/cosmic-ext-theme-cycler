@@ -957,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "cosmic-ext-theme-cycler"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "cycler-core",
@@ -1164,7 +1164,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "cycler-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cosmic-config",
  "cosmic-theme",

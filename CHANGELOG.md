@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - New **Auto** toggle in the right-click list: the light theme you last
   picked is applied after sunup and the dark one after sunset. Set your

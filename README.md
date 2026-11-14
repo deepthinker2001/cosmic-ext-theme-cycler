@@ -17,7 +17,7 @@ beside stock COSMIC without replacing any of its components.
 
 ## Status
 
-**0.2.0.** In daily use on Pop!_OS 24.04 with COSMIC
+**0.3.0.** In daily use on Pop!_OS 24.04 with COSMIC
 epoch-1.11.0, the release it is built against. The design is in
 [docs/applet.md](docs/applet.md); the changes in each release are under
 [Changelog](#changelog) below.
@@ -149,6 +149,13 @@ delete them.
 
 What changed in each version. The full notes are in
 [CHANGELOG.md](CHANGELOG.md).
+
+### 0.3.0
+
+- **Auto mode.** A new **Auto** toggle in the right-click list applies the
+  light theme you last picked after sunup and the dark one after sunset.
+  Set your latitude and longitude, or leave them empty to use an estimate
+  from your time zone; the applet never uses the network for this.
 
 ### 0.2.0
 
