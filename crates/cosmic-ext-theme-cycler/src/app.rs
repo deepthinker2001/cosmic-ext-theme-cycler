@@ -36,8 +36,11 @@ use cycler_core::cycle;
 use cycler_core::habit;
 use cycler_core::library::{self, LibraryError, Scan, Source, Theme};
 use cycler_core::panel::{self, PanelApplets};
-use cycler_core::schedule::{self, Place};
+use cycler_core::schedule;
 use cycler_core::settings::{CONFIG_VERSION, Settings};
+
+mod auto;
+use auto::now_minutes;
 
 use crate::saver::Saver;
 use crate::{APP_ID, ICON, apply, background, fl, restore, shutdown, tooltip};
@@ -46,9 +49,6 @@ use crate::{APP_ID, ICON, apply, background, fl, restore, shutdown, tooltip};
 /// before what was there comes back: passing over the list doesn't flash
 /// the desktop.
 const DWELL: Duration = Duration::from_millis(200);
-
-/// How often Auto looks at the time of day.
-const AUTO_EVERY: Duration = Duration::from_secs(60);
 
 /// The key stem of the list entry for the theme COSMIC showed before the
 /// applet; its key is `original:theme`.
@@ -93,14 +93,8 @@ pub struct ThemeCycler {
     /// The original theme is being, or has been, put back after the applet
     /// was taken out of the panel.
     reverted: bool,
-    /// The period (light or dark) Auto last acted on, so it applies a theme
-    /// once per period and doesn't fight a manual choice made since.
-    auto_period: Option<Variant>,
-    /// The theme being written was applied by Auto, not picked by the user.
-    applying_auto: bool,
-    /// What the popup's latitude and longitude boxes hold while typing.
-    pub(crate) latitude_text: String,
-    pub(crate) longitude_text: String,
+    /// Auto's state (auto.rs).
+    pub(crate) auto: auto::Auto,
 }
 
 /// Showing a theme while the pointer rests on it.
@@ -257,7 +251,7 @@ impl cosmic::Application for ThemeCycler {
             );
         }
         if self.settings.auto {
-            subscriptions.push(iced::time::every(AUTO_EVERY).map(|_| Message::AutoTick));
+            subscriptions.push(iced::time::every(auto::EVERY).map(|_| Message::AutoTick));
         }
         if self.settings_stale {
             subscriptions
@@ -297,11 +291,11 @@ impl cosmic::Application for ThemeCycler {
             Message::SetAuto(on) => return self.set_auto(on),
             Message::AutoTick => return self.auto_tick(),
             Message::Latitude(text) => {
-                self.latitude_text = text;
+                self.auto.latitude_text = text;
                 return self.place_typed();
             }
             Message::Longitude(text) => {
-                self.longitude_text = text;
+                self.auto.longitude_text = text;
                 return self.place_typed();
             }
         }
@@ -360,13 +354,12 @@ impl ThemeCycler {
             was_in_panel: Arc::new(AtomicBool::new(false)),
             tooltip_name: tooltip::Name::default(),
             reverted: false,
-            auto_period: None,
-            applying_auto: false,
-            latitude_text: String::new(),
-            longitude_text: String::new(),
+            auto: auto::Auto::default(),
         };
-        applet.latitude_text = degrees_text(applet.settings.place_milli().map(|(lat, _)| lat));
-        applet.longitude_text = degrees_text(applet.settings.place_milli().map(|(_, lon)| lon));
+        applet.auto.latitude_text =
+            auto::degrees_text(applet.settings.place_milli().map(|(lat, _)| lat));
+        applet.auto.longitude_text =
+            auto::degrees_text(applet.settings.place_milli().map(|(_, lon)| lon));
         applet.sync_tooltip();
         applet
     }
@@ -525,7 +518,7 @@ impl ThemeCycler {
         };
         let original = self.preview.original.clone();
         self.writing = true;
-        self.applying_auto = auto;
+        self.auto.applying = auto;
         cosmic::task::future(async move {
             let applied_key = key.clone();
             let result =
@@ -538,7 +531,7 @@ impl ThemeCycler {
 
     fn applied(&mut self, key: &str, result: Result<(), String>) -> Task<Message> {
         self.writing = false;
-        let by_auto = std::mem::take(&mut self.applying_auto);
+        let by_auto = std::mem::take(&mut self.auto.applying);
         if let Some(started) = self.click_started.take() {
             tracing::debug!(theme = %key, elapsed = ?started.elapsed(), "click handled");
         }
@@ -559,7 +552,7 @@ impl ThemeCycler {
             Err(error) => {
                 if by_auto {
                     // Try again at the next tick.
-                    self.auto_period = None;
+                    self.auto.period = None;
                 }
                 self.notice = Some(Notice::ApplyFailed(error));
             }
@@ -599,92 +592,6 @@ impl ThemeCycler {
             habit::push(&mut self.settings.switch_history, record);
         }
         self.save_settings();
-    }
-
-    /// Where the user is: the place entered, else an estimate from the time
-    /// zone. Never from the network.
-    pub(crate) fn place(&self) -> Place {
-        self.settings.place_milli().map_or_else(
-            || schedule::estimate_place(utc_offset_minutes()),
-            Place::from_milli,
-        )
-    }
-
-    /// The Auto toggle: on, the theme for the time of day is applied now.
-    fn set_auto(&mut self, on: bool) -> Task<Message> {
-        self.settings.auto = on;
-        self.auto_period = None;
-        self.save_settings();
-        self.auto_tick()
-    }
-
-    /// The theme Auto applies for `variant`: the one the user last picked
-    /// for it, else the first toggled on for the cycle.
-    fn auto_theme(&self, variant: Variant) -> Option<String> {
-        let preferred = match variant {
-            Variant::Light => &self.settings.light_theme,
-            Variant::Dark => &self.settings.dark_theme,
-        };
-        let of_kind = |key: &str| {
-            self.theme(key)
-                .is_some_and(|theme| theme.variant == variant)
-        };
-        preferred.clone().filter(|key| of_kind(key)).or_else(|| {
-            self.selected_themes()
-                .into_iter()
-                .map(|(key, _)| key)
-                .find(|key| of_kind(key))
-        })
-    }
-
-    /// Auto's timer: when the time of day calls for the other kind than
-    /// last time, apply the theme for it. Waits for a running write.
-    fn auto_tick(&mut self) -> Task<Message> {
-        if !self.settings.auto || self.writing || self.scan.is_none() {
-            return Task::none();
-        }
-        let history = &self.settings.switch_history;
-        let Some(wanted) = schedule::wanted_variant(self.place(), now_minutes(), history) else {
-            return Task::none();
-        };
-        if self.auto_period == Some(wanted) {
-            return Task::none();
-        }
-        self.auto_period = Some(wanted);
-        let Some(key) = self.auto_theme(wanted) else {
-            return Task::none();
-        };
-        if self.settings.last_applied.as_deref() == Some(key.as_str()) {
-            return Task::none();
-        }
-        // As a click does: no more dwells, and the write puts a preview's
-        // original back first.
-        self.preview.generation += 1;
-        self.preview.waiting = None;
-        self.apply_key(key, true)
-    }
-
-    /// The latitude or longitude box changed: once both hold a place within
-    /// bounds (or both are empty: no place, so the estimate), keep it.
-    fn place_typed(&mut self) -> Task<Message> {
-        let place = match (
-            parse_degrees(&self.latitude_text, 90),
-            parse_degrees(&self.longitude_text, 180),
-        ) {
-            (Some(latitude), Some(longitude)) => Some((latitude, longitude)),
-            _ if self.latitude_text.trim().is_empty() && self.longitude_text.trim().is_empty() => {
-                None
-            }
-            // Half typed, or not a place: keep the last good one.
-            _ => return Task::none(),
-        };
-        if place == self.settings.place_milli() {
-            return Task::none();
-        }
-        self.settings.latitude_milli = place.map(|(latitude, _)| latitude);
-        self.settings.longitude_milli = place.map(|(_, longitude)| longitude);
-        self.save_settings();
-        self.auto_tick()
     }
 
     /// Toggles a theme on or off for the cycle; the list doesn't move.
@@ -919,41 +826,6 @@ impl ThemeCycler {
     }
 }
 
-/// Minutes since the Unix epoch, UTC.
-fn now_minutes() -> i64 {
-    chrono::Utc::now().timestamp().div_euclid(60)
-}
-
-/// The computer's offset from UTC now, in minutes (east positive).
-fn utc_offset_minutes() -> i32 {
-    chrono::Local::now().offset().local_minus_utc() / 60
-}
-
-/// A latitude or longitude as typed (a decimal comma is fine), in
-/// thousandths of a degree; `None` unless it is a number within
-/// ±`max_degrees`. What is typed is untrusted: NaN and infinity fail the
-/// range check.
-fn parse_degrees(text: &str, max_degrees: i32) -> Option<i32> {
-    let degrees: f64 = text.trim().replace(',', ".").parse().ok()?;
-    let max = f64::from(max_degrees);
-    if !(-max..=max).contains(&degrees) {
-        return None;
-    }
-    // Within ±180000 after the range check.
-    #[allow(clippy::cast_possible_truncation)]
-    Some((degrees * 1000.0).round() as i32)
-}
-
-/// Thousandths of a degree as the box shows them; empty for none.
-fn degrees_text(milli: Option<i32>) -> String {
-    milli.map_or_else(String::new, |milli| {
-        let sign = if milli < 0 { "-" } else { "" };
-        let milli = milli.unsigned_abs();
-        let text = format!("{sign}{}.{:03}", milli / 1000, milli % 1000);
-        text.trim_end_matches('0').trim_end_matches('.').to_owned()
-    })
-}
-
 /// How bright a theme's background is, by its relative luminance.
 fn brightness(theme: &Theme) -> f32 {
     let background = theme.background;
@@ -1077,6 +949,7 @@ mod tests {
     use cosmic::Application as _;
     use cosmic::cosmic_theme::palette::Srgba;
 
+    use super::auto::{degrees_text, parse_degrees};
     use super::*;
 
     fn theme(key: &str, builder: ThemeBuilder) -> Theme {
@@ -1414,7 +1287,7 @@ mod tests {
         let _ = applet.update(Message::SetAuto(true));
         assert!(applet.settings.auto);
         assert!(applet.writing, "the theme for the time of day is written");
-        let wanted = applet.auto_period.expect("a period was chosen");
+        let wanted = applet.auto.period.expect("a period was chosen");
         let key = match wanted {
             Variant::Light => "pale-light",
             Variant::Dark => "grey-dark",

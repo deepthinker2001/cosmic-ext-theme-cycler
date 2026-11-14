@@ -50,12 +50,12 @@ impl ThemeCycler {
         let boxes = row::with_capacity(2)
             .spacing(spacing.space_xxs)
             .push(
-                text_input(fl!("latitude"), &self.latitude_text)
+                text_input(fl!("latitude"), &self.auto.latitude_text)
                     .on_input(Message::Latitude)
                     .width(Length::Fill),
             )
             .push(
-                text_input(fl!("longitude"), &self.longitude_text)
+                text_input(fl!("longitude"), &self.auto.longitude_text)
                     .on_input(Message::Longitude)
                     .width(Length::Fill),
             );
