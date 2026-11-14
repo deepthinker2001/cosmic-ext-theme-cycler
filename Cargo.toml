@@ -3,7 +3,7 @@ members = ["crates/cycler-core", "crates/cosmic-ext-theme-cycler"]
 resolver = "3"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 # The installed cosmic-applets baseline builds with Rust 1.93 (its
 # rust-toolchain.toml), and libcosmic at the pinned revision requires it.
