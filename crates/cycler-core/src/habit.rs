@@ -2,7 +2,9 @@
 //!
 //! Each manual choice is recorded as minutes relative to the day's sun time:
 //! after sunrise for going light, after sunset for going dark (negative
-//! means before). From a bounded history, [`typical_offset`] derives a
+//! means before). Choices more than six hours from the sun time are not
+//! recorded. Nothing in the applet records them yet; that wiring is a
+//! follow-up. From a bounded history, [`typical_offset`] derives a
 //! recency-weighted median per variant; with no history the offset is 0, so
 //! the switch happens at the sun time itself.
 //!
@@ -15,9 +17,13 @@ use crate::Variant;
 /// The most records kept; older ones are dropped.
 pub const MAX_HISTORY: usize = 64;
 
-/// Offsets beyond this many minutes (12 hours) either way are not a habit
-/// tied to that sun time and are clamped.
-pub const MAX_OFFSET_MINUTES: i32 = 720;
+/// Minutes in a day; offsets are wrapped around it.
+const DAY_MINUTES: i64 = 1440;
+
+/// A choice more than this many minutes (6 hours) either side of the sun
+/// time is not a habit tied to it (a stray 3 a.m. switch, say) and is not
+/// recorded; stored records beyond it are dropped on load.
+pub const MAX_OFFSET_MINUTES: i32 = 360;
 
 /// One manual choice.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -30,52 +36,56 @@ pub struct SwitchRecord {
 }
 
 /// Build a record from the time of the choice and the sun time it is
-/// measured from, both in minutes on one common clock (e.g. since midnight
-/// or since the epoch). Light is measured from `sunrise`, dark from
-/// `sunset`. The offset is clamped to ±[`MAX_OFFSET_MINUTES`].
+/// measured from, both in minutes on one common clock (since midnight or
+/// since the epoch). Light is measured from `sunrise`, dark from `sunset`.
+/// The difference wraps around the day into (-720, 720], so a choice at
+/// 00:30 against a sunset at 23:50 is +40. `None` when the offset is
+/// beyond ±[`MAX_OFFSET_MINUTES`]: such a choice is no habit.
 #[must_use]
-pub fn record_for(variant: Variant, now: i64, sunrise: i64, sunset: i64) -> SwitchRecord {
+pub fn record_for(variant: Variant, now: i64, sunrise: i64, sunset: i64) -> Option<SwitchRecord> {
     let reference = match variant {
         Variant::Light => sunrise,
         Variant::Dark => sunset,
     };
-    let limit = i64::from(MAX_OFFSET_MINUTES);
-    let offset = (now - reference).clamp(-limit, limit);
-    SwitchRecord {
-        variant,
-        // Within ±720 by the clamp.
-        offset_minutes: i32::try_from(offset).unwrap_or(0),
+    let mut wrapped = now.saturating_sub(reference).rem_euclid(DAY_MINUTES);
+    if wrapped > DAY_MINUTES / 2 {
+        wrapped -= DAY_MINUTES;
     }
+    let offset_minutes = i32::try_from(wrapped).ok()?;
+    in_range(offset_minutes).then_some(SwitchRecord {
+        variant,
+        offset_minutes,
+    })
 }
 
-/// Append a record, dropping the oldest ones beyond [`MAX_HISTORY`].
+fn in_range(offset_minutes: i32) -> bool {
+    offset_minutes.abs() <= MAX_OFFSET_MINUTES
+}
+
+/// Append a record, dropping the oldest ones beyond [`MAX_HISTORY`]. A
+/// record beyond ±[`MAX_OFFSET_MINUTES`] is ignored.
 pub fn push(history: &mut Vec<SwitchRecord>, record: SwitchRecord) {
-    history.push(SwitchRecord {
-        offset_minutes: record
-            .offset_minutes
-            .clamp(-MAX_OFFSET_MINUTES, MAX_OFFSET_MINUTES),
-        ..record
-    });
+    if !in_range(record.offset_minutes) {
+        return;
+    }
+    history.push(record);
     if history.len() > MAX_HISTORY {
         let excess = history.len() - MAX_HISTORY;
         history.drain(..excess);
     }
 }
 
-/// The history within bounds: offsets clamped, the newest [`MAX_HISTORY`]
-/// kept.
+/// The history within bounds: out-of-range records dropped, the newest
+/// [`MAX_HISTORY`] kept.
 #[must_use]
 pub fn clamp_history(history: &[SwitchRecord]) -> Vec<SwitchRecord> {
-    let start = history.len().saturating_sub(MAX_HISTORY);
-    history[start..]
+    let valid: Vec<SwitchRecord> = history
         .iter()
-        .map(|record| SwitchRecord {
-            offset_minutes: record
-                .offset_minutes
-                .clamp(-MAX_OFFSET_MINUTES, MAX_OFFSET_MINUTES),
-            ..*record
-        })
-        .collect()
+        .copied()
+        .filter(|record| in_range(record.offset_minutes))
+        .collect();
+    let start = valid.len().saturating_sub(MAX_HISTORY);
+    valid[start..].to_vec()
 }
 
 /// The user's typical offset in minutes for switching to `variant`: the
@@ -159,7 +169,7 @@ mod tests {
     fn an_outlier_does_not_move_the_median() {
         let history = [
             rec(Variant::Light, 10),
-            rec(Variant::Light, 600),
+            rec(Variant::Light, 300),
             rec(Variant::Light, 12),
             rec(Variant::Light, 11),
             rec(Variant::Light, 10),
@@ -171,16 +181,37 @@ mod tests {
     fn records_are_measured_from_the_right_sun_time() {
         assert_eq!(
             record_for(Variant::Light, 460, 420, 1200),
-            rec(Variant::Light, 40)
+            Some(rec(Variant::Light, 40))
         );
         assert_eq!(
             record_for(Variant::Dark, 1180, 420, 1200),
-            rec(Variant::Dark, -20)
+            Some(rec(Variant::Dark, -20))
         );
+    }
+
+    #[test]
+    fn offsets_wrap_around_midnight() {
+        // 00:30 against a sunset at 23:50.
         assert_eq!(
-            record_for(Variant::Dark, 100_000, 420, 1200).offset_minutes,
-            MAX_OFFSET_MINUTES
+            record_for(Variant::Dark, 30, 420, 1430),
+            Some(rec(Variant::Dark, 40))
         );
+        // 23:50 against a sunrise at 00:10.
+        assert_eq!(
+            record_for(Variant::Light, 1430, 10, 1200),
+            Some(rec(Variant::Light, -20))
+        );
+    }
+
+    #[test]
+    fn strays_and_extremes_are_not_recorded() {
+        // 3 a.m. against a sunset at 18:00 is +9h.
+        assert_eq!(record_for(Variant::Dark, 180, 420, 1080), None);
+        // Extreme inputs saturate instead of overflowing.
+        let _ = record_for(Variant::Dark, i64::MAX, 0, i64::MIN);
+        let mut history = Vec::new();
+        push(&mut history, rec(Variant::Dark, 400));
+        assert_eq!(history, Vec::new());
     }
 
     #[test]
@@ -191,7 +222,8 @@ mod tests {
         }
         assert_eq!(history.len(), MAX_HISTORY);
         assert_eq!(history[0].offset_minutes, 5);
-        let long: Vec<_> = (0..200).map(|n| rec(Variant::Dark, n * 100)).collect();
+        let mut long: Vec<_> = (0..200).map(|n| rec(Variant::Dark, n)).collect();
+        long.push(rec(Variant::Dark, 5000));
         let clamped = clamp_history(&long);
         assert_eq!(clamped.len(), MAX_HISTORY);
         assert!(
